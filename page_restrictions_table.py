@@ -82,6 +82,5 @@ def full_gen():
             for item in gen(key):
                 yield item
 
-
-
-insert()
+if __name__ == "__main__":
+    insert()
