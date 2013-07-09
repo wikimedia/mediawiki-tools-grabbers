@@ -30,7 +30,7 @@ def gen():
 
 def insert():
     print 'Populating the protected_titles table...'
-    conn = oursql.connect(host=settings.db_host, user=settings.db_pass, passwd=settings.db_pass,
+    conn = oursql.connect(host=settings.db_host, user=settings.db_user, passwd=settings.db_pass,
                           db=settings.db_name)
     cur = conn.cursor()
     cur.executemany('INSERT INTO `protected_titles` VALUES (?,?,?,?,?,?,?);', parse(gen()))

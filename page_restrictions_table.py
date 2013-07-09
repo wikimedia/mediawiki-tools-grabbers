@@ -37,7 +37,7 @@ def gen(ns=0):
 
 def insert():
     print 'Populating the page_restrictions table...'
-    conn = oursql.connect(host=settings.db_host, user=settings.db_pass, passwd=settings.db_pass,
+    conn = oursql.connect(host=settings.db_host, user=settings.db_user, passwd=settings.db_pass,
                           db=settings.db_name)
     cur = conn.cursor()
     cur.executemany('INSERT IGNORE INTO `page_restrictions` VALUES (?,?,?,?,?,?,?);', parse(full_gen()))
