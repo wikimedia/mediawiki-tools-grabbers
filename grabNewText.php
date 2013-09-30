@@ -17,28 +17,36 @@ ini_set( 'include_path', dirname( __FILE__ ) . '/../maintenance' );
 require_once( 'Maintenance.php' );
 require_once( 'mediawikibot.class.php' );
 
-class GrabText extends Maintenance {
+class GrabNewText extends Maintenance {
 	public function __construct() {
 		parent::__construct();
-		$this->mDescription = "Grab text from an external wiki and import it into one of ours.\nDon't use this on a large wiki unless you absolutely must; it will be incredibly slow.";
+		$this->mDescription = "Grab new changes from an external wiki and add it over an imported dump.\nFor use when the available dump is slightly out of date.";
 		$this->addOption( 'url', 'URL to the target wiki\'s api.php', true /* required? */, true /* withArg */, 'u' );
 		$this->addOption( 'username', 'Username to log into the target wiki', false, true, 'n' );
 		$this->addOption( 'password', 'Password on the target wiki', false, true, 'p' );
 		$this->addOption( 'db', 'Database name, if we don\'t want to write to $wgDBname', false, true );
-		# $this->addOption( 'start', 'Revision number at which to start', false, true );
+		$this->addOption( 'startdate', 'Start point (20121222142317, 2012-12-22T14:23:17T, etc); note that this cannot go back further than 1-3 months on most projects.', true, true );
 		$this->addOption( 'enddate', 'End point (20121222142317, 2012-12-22T14:23:17T, etc); defaults to current timestamp.', false, true );
 	}
 
 	public function execute() {
-		global $bot, $endDate, $wgDBname, $lastRevision;
+		global $bot, $endDate, $startDate, $wgDBname, $lastRevision;
 		$url = $this->getOption( 'url' );
 		if( !$url ) {
 			$this->error( "The URL to the source wiki\'s api.php must be specified!\n", true );
 		}
-		$onlyNamespaces = $this->getOption( 'nsinfo' );
 
 		$user = $this->getOption( 'username' );
 		$password = $this->getOption( 'password' );
+
+		$startDate = $this->getOption( 'startdate' );
+		if ( $startDate ) {
+			if ( !wfTimestamp( TS_ISO_8601, $startDate ) ) {
+				$this->error( "Invalid startdate format.\n", true );
+			}
+		} else {
+			$this->error( "A timestamp to start from is required.\n", true );
+		}
 		$endDate = $this->getOption( 'enddate' );
 		if ( $endDate ) {
 			if ( !wfTimestamp( TS_ISO_8601, $endDate ) ) {
@@ -72,108 +80,216 @@ class GrabText extends Maintenance {
 			);
 		}
 
-		$pageList = array();
 		$this->output( "\n" );
 
-		# Get all pages as a list, start by getting namespace numbers...
-		$this->output( "Retreiving namespaces list...\n" );
+		# Get page changes from recentchanges and crap
+		$this->processRecentLogs();
+		$this->processRecentChanges();
+
+		# Done.
+	}
+
+	/**
+	 * Get page edits and creations
+	 *
+	 */
+	function processRecentChanges() {
+		global $wgDBname, $endDate, $startDate, $bot;
+
+		$blackList = array(); # Don't get new edits for these
+		$more = true;
+		$count = 0;
+
+		# Get last revision id to avoid duplicates
+		$dbr = wfGetDB( DB_SLAVE, array(), $this->getOption( 'db', $wgDBname ) );
+		$result = (int)$dbr->selectField(
+			'revision',
+			'rev_id',
+			array(),
+			__METHOD__,
+			array( 'ORDER BY' => 'rev_id DESC' )
+		);
+		$lastRevision = $result;
+
+		# Get edits
+		$params = array(
+			'list' => 'recentchanges',
+			'rcdir' => 'newer',
+			'rctype' => 'edit|new',
+			'rclimit' => 'max',
+			'rcprop' => 'title|sizes|redirect|ids',
+			'rcend' => $endDate
+		);
+		$rcstart = $startDate;
+		$count = 0;
+		$more = true;
+
+		$this->output( "Retreiving list of changed pages...\n" );
+		while ( $more ) {
+			$params['rcstart'] = $rcstart;
+
+			$result = $bot->query( $params );
+			if ( empty( $result['query']['recentchanges'] ) ) {
+				$this->output( 'No changes found...', true );
+			}
+			foreach ( $result['query']['recentchanges'] as $entry ) {
+				# new pages, new uploads, edited pages
+				# while more, parse into $pagesList
+				if ( ( $count % 500 ) == 0 ) {
+					$this->output( "$count\n" );
+				}
+
+				$title = $entry['title'];
+				$ns = $entry['ns'];
+				if( $ns != 0 ) {
+					$title = preg_replace( '/^[^:]*?:/', '', $title );
+				}
+				$title = str_replace( ' ', '_', $title );
+				$listKey = $ns."cowz".$title;
+
+				if ( in_array( $listKey, $blackList ) ) {
+					# Already done; continue
+					continue;
+				}
+				$blackList[] = $listKey;
+
+				$pageInfo = array(
+					'pageid' => $entry['pageid'],
+					'title' => $entry['title'],
+					'ns' => $ns,
+					'protection' => '',
+					'redirect' => 0,
+					'length' => $entry['newlen']
+				);
+				if ( isset( $entry['redirect'] ) ) {
+					$pageInfo['redirect'] = 1;
+				}
+				$this->processPage( $pageInfo, $startDate );
+
+				$count++;
+			}
+			if ( isset( $result['query-continue'] ) ) {
+				$rcstart = $result['query-continue']['recentchanges']['rcstart'];
+			} else {
+				$rcstart = null;
+			}
+			$more = !( $rcstart === null );
+		}
+		$this->output( "\n" );
+	}
+
+	/**
+	 * Get delete/move/import changes
+	 *
+	 */
+	function processRecentLogs () {
+		global $bot, $endDate, $wgDBname, $startDate;
 
 		$params = array(
-			'meta' => 'siteinfo',
-			'siprop' => 'namespaces|statistics|namespacealiases'
+			'list' => 'logevents',
+			'ledir' => 'newer',
+			'letype' => 'delete|move|import',
+			'lelimit' => 'max',
+			'leend' => $endDate
 		);
-		$result = $bot->query( $params );
-		$siteinfo = $result['query'];
+		$lestart = null;
+		$more = true;
 
-		# No data - bail out early
-		if ( empty( $siteinfo ) ) {
-			$this->error( 'No siteinfo data found...', true );
-		}
-
-		$textNamespaces = array();
-		foreach ( array_keys( $siteinfo['namespaces'] ) as $ns ) {
-			# Ignore special and weird Wikia namespaces
-			if ( $ns  < 0 || $ns >= 400 ) {
-				continue;
+		$this->output( "Updating deleted and moved items...\n" );
+		while ( $more ) {
+			if ( $lestart === null ) {
+				$params['lestart'] = $startDate;
+			} else {
+				$params['lestart'] = $lestart;
 			}
-			$textNamespaces[] = $ns;
-		}
-		if ( !$textNamespaces ) {
-			$this->error( 'Got no namespaces...', true );
-		}
-
-		# Get list of live pages from namespaces and continue from there
-		$pageCount = $siteinfo['statistics']['pages'];
-
-		$this->output( "Generating page list - $pageCount expected...\n" );
-		$pageCount = 0;
-		$pageList = array();
-
-		foreach ( $textNamespaces as $ns ) {
-			$nsPageCount = 0;
-			$more = true;
-			$gapfrom = null;
-			$params = array(
-				'generator' => 'allpages',
-				'gaplimit' => 'max',
-				'prop' => 'info',
-				'inprop' => 'protection',
-				'gapnamespace' => $ns
-			);
-			do {
-				# Note - 'gapfrom' became 'gapcontinue' in mw1.20, though the former is still supported.
-				if ( $gapfrom === null ) {
-					unset( $params['gapfrom'] );
-				} else {
-					$params['gapfrom'] = $gapfrom;
-				}
-				$result = $bot->query( $params );
-
-				# Skip empty namespaces
-				if ( isset( $result['query'] ) ) {
-					$pages = $result['query']['pages'];
-
-					$resultsCount = 0;
-					foreach ( $pages as $page ) {
-						$pageList[] = $page;
-						$resultsCount++;
+			$result = $bot->query( $params );
+			if ( empty( $result['query']['logevents'] ) ) {
+				$this->output( "No changes found...\n", true );
+			} else {
+				$dbw = wfGetDB( DB_MASTER, array(), $this->getOption( 'db', $wgDBname ) );
+				foreach ( $result['query']['logevents'] as $logEntry ) {
+					if ( ( $count % 500 ) == 0 ) {
+						$this->output( "$count\n" );
 					}
-					$nsPageCount += $resultsCount;
+					$pageid = $logEntry['pageid'];
+					$title = $logEntry['title'];
+					$ns = $logEntry['ns'];
+					$title = $this->sanitiseTitle( $ns, $title );
 
-					# Try mw1.20+ version and fall back to old gapfrom if it fails.
-					if ( isset( $result['query-continue'] ) ) {
-						if ( isset( $result['query-continue']['allpages']['gapcontinue'] ) ) {
-							$gapfrom = $result['query-continue']['allpages']['gapcontinue'];
-						} else $gapfrom = $result['query-continue']['allpages']['gapfrom'];
-					} else {
-						$gapfrom = null;
+					if ( $logEntry['action'] == 'move' ) {
+						$this->output( "$ns:$title was moved; updating....\n" );
+						# Move our copy
+						# New title
+						$redirect = true;
+						$pageID = $logEntry['pageid'];
+						$newns = $logEntry['move']['new_ns'];
+						$newTitle = $this->sanitiseTitle( $newns, $logEntry['move']['new_title'] );
+						if ( !$pageID ) {
+							$pageID = $this->getPageID( $ns, $title );
+							if ( !$pageID ) {
+								$this->output( "$ns:$title not found in database.\n" );
+								# Failed. Meh.
+								continue;
+							}
+							# Redirect surpressed
+							$redirect = false;
+						}
+						$source = Title::newFromText( $logEntry['title'] );
+						$dest = Title::newFromText( $logEntry['move']['new_title'] );
+
+						$dbw->begin( __METHOD__ );
+						$err = $source->moveTo( $dest, false, '', $redirect );
+						if ( $err !== true ) {
+							$msg = array_shift( $err[0] );
+							$this->output( "\nFAILED: " . wfMessage( $msg, $err[0] )->text() );
+						}
+						$dbw->commit( __METHOD__ );
+
 					}
-					$more = !( $gapfrom === null );
-				} else {
-					$more = false;
+					elseif ( $logEntry['action'] ==  'delete' ) {
+						$this->output( "$ns:$title was deleted; updating....\n" );
+						# Delete our copy, move revisions -> archive
+						$this->updateDeleted( $ns, $title, $dbw );
+					}
+					elseif ( $logEntry['action'] == 'restore' ) {
+						$this->output( "$ns:$title was undeleted; updating....\n" );
+						# Remove any revisions from archive and process as new
+						$page = $this->updateRestored( $ns, $title, $dbw );
+
+						if ( $page ) {
+							$this->processPage( $page );
+							$this->output( "$ns:$title processed.\n" );
+							$blackList[] = $ns."cowz".$title;
+						}
+					}
+					elseif ( $logEntry['action'] == 'upload' ) {
+						$this->output( "$ns:$title was imported; updating....\n" );
+						# Process as new
+						if ( !$pageID ) {
+							$pageID = '';
+						}
+						$pageInfo = array(
+							'pageid' => $pageID,
+							'title' => $title,
+							'ns' => $ns,
+							'protection' => '',
+							'redirect' => 0,
+							'length' => null
+						);
+						$this->processPage( $pageInfo );
+						#... not tested
+					}
+					$count++;
 				}
-			} while ( $more );
-
-			$this->output( "$nsPageCount pages found in namespace $ns.\n" );
-			$pageCount += $nsPageCount;
-		}
-		$this->output( "\nPage list saved - found $pageCount total pages.\n" );
-		$this->output( "\n" );
-
-		$this->output( "Saving all pages, including text, edit history and protection settings...\n" );
-
-		$currentPage = 0;
-		$this->output( "0 pages committed...\n" );
-		foreach ( $pageList as $page ) {
-			$this->processPage( $page );
-			$currentPage++;
-			if ( $currentPage % 500 == 0 ) {
-				$this->output( "$currentPage\n" );
 			}
+			if ( isset( $result['query-continue'] ) ) {
+				$lestart = $result['query-continue']['logevents']['lestart'];
+			} else {
+				$lestart = null;
+			}
+			$more = !( $lestart === null );
 		}
-
 		$this->output( "\n" );
-		# Done.
 	}
 
 	/**
@@ -193,7 +309,7 @@ class GrabText extends Maintenance {
 		$localID = $pageID;
 		$titleIsPresent = false;
 
-		$this->output( "Processing page $pageID: $title...\n" );
+		$this->output( "Processing page $pageID...\n" );
 
 		# Trim and convert displayed title to database page title
 		if( $ns != 0 ) {
@@ -418,41 +534,21 @@ class GrabText extends Maintenance {
 	function processRevision( $revision, $page_id, $prev_rev_id ) {
 		global $wgLang, $wgDBname, $lastRevision;
 
-		if ( $revision['revid'] <= $lastRevision ) {
-			# Oops? Too recent.
+		if ( $revision['revid'] <= $lastRevision) {
+			# Oops?
 			return false;
 		}
-
-		# Sloppy handler for revdeletions; just fills them in with dummy text
-		# and sets bitfield thingy
-		$revdeleted = 0;
-		if ( isset( $revision['userhidden'] ) ) {
-			$revdeleted = $revdeleted | 4;
-			$revision['user'] = 'username removed';
-			$revision['userid'] = 0;
-		}
-		if ( isset( $revision['commenthidden'] ) ) {
-			$revdeleted = $revdeleted | 2;
-			$revision['comment'] = 'edit summary removed';
-		}
-		if ( isset( $revision['texthidden'] ) ) {
-			$revdeleted = $revdeleted | 1;
-			$revision['*'] = 'This content has been removed.';
-		}
-
 		# Workaround check if it's already there.
-		if ( false ) {
-			$dbr = wfGetDB( DB_SLAVE, array(), $this->getOption( 'db', $wgDBname ) );
-			$result = $dbr->select(
-				'revision',
-				'rev_page',
-				array( 'rev_id' => $revision['revid'] ),
-				__METHOD__
-			);
-			if ( $dbr->fetchObject( $result ) ) {
-				# Already in database
-				return false;
-			}
+		$dbr = wfGetDB( DB_SLAVE, array(), $this->getOption( 'db', $wgDBname ) );
+		$result = $dbr->select(
+			'revision',
+			'rev_page',
+			array( 'rev_id' => $revision['revid'] ),
+			__METHOD__
+		);
+		if ( $dbr->fetchObject( $result ) ) {
+			# Already in database
+			return false;
 		}
 
 		$text = $revision['*'];
@@ -472,7 +568,7 @@ class GrabText extends Maintenance {
 			'user_text' => $revision['user'],
 			'timestamp' => wfTimestamp( TS_MW, $revision['timestamp'] ),
 			'minor_edit' => ( isset( $reisionv['minor'] ) ? 1 : 0 ),
-			'deleted' => $revdeleted,
+			'deleted' => 0,	#revdeleted; would need a handler elsewhere for these
 			'len' => strlen( $text ),
 			'parent_id' => ( $prev_rev_id || 0 )
 		);
@@ -547,6 +643,115 @@ class GrabText extends Maintenance {
 		return $current_text_id;
 	}
 
+	function updateDeleted( $ns, $title, $dbw ) {
+		global $wgDBname;
+		$e = array(
+			'ar_text' => '',
+			'ar_flags' => '',
+			'ar_namespace' => $ns,
+			'ar_title' => $title
+		);
+		$e['ar_page_id'] = $this->getPageID( $ns, $title );
+		if ( !$e['ar_page_id'] ) {
+			# Can't continue without an id.
+			return;
+		}
+
+		# Get and insert revision data
+		$dbr = wfGetDB( DB_SLAVE, array(), $this->getOption( 'db', $wgDBname ) );
+		$result = $dbr->select(
+			'revision',
+			array(
+				'rev_comment',
+				'rev_user',
+				'rev_user_text',
+				'rev_timestamp',
+				'rev_minor_edit',
+				'rev_id',
+				'rev_text_id',
+				'rev_deleted',
+				'rev_len',
+				'rev_parent_id',
+				'rev_sha1'
+			),
+			array( 'rev_page' => $e['ar_page_id'] ),
+			__METHOD__
+		);
+		foreach ( $result as $row ) {
+			$e['ar_comment'] = $row->rev_comment;
+			$e['ar_user'] = $row->rev_user;
+			$e['ar_user_text'] = $row->rev_user_text;
+			$e['ar_timestamp'] = $row->rev_timestamp;
+			$e['ar_minor_edit'] = $row->rev_minor_edit;
+			$e['ar_rev_id'] = $row->rev_id;
+			$e['ar_text_id'] = $row->rev_text_id;
+			$e['ar_deleted'] = $row->rev_deleted;
+			$e['ar_len'] = $row->rev_len;
+			$e['ar_parent_id'] = $row->rev_parent_id;
+			$e['ar_sha1'] = $row->rev_sha1;
+
+			$dbw->insert( 'archive', $e, __METHOD__ );
+		}
+
+		# Delete page and revision entries
+		$dbw->delete(
+			'page',
+			array( 'page_id' => $e['ar_page_id'] ),
+			__METHOD__
+		);
+		$dbw->delete(
+			'revision',
+			array( 'rev_page' => $e['ar_page_id'] ),
+			__METHOD__
+		);
+		# Full clean up in general database rebuild.
+	}
+
+	function updateRestored( $ns, $title, $dbw ) {
+		$pageID = $this->getPageID( $ns, $title );
+		if ( $pageID ) {
+			$dbw->delete(
+				'archive',
+				array(
+					'ar_title' => $title,
+					'ar_namespace' => $ns
+				),
+				__METHOD__
+			);
+		} else {
+			$pageID = '';
+		}
+		$pageInfo = array(
+			'pageid' => $pageID,
+			'title' => $title,
+			'ns' => $ns,
+			'protection' => '',
+			'redirect' => 0,
+			'length' => null
+		);
+		return $pageInfo;
+	}
+
+	# For use with deleted crap that chucks the id; spotty at best.
+	function getPageID( $ns, $title ) {
+		$dbr = wfGetDB( DB_SLAVE );
+		$result = $dbr->select(
+			'page',
+			array( 'page_id' ),
+			array(
+				'page_namespace' => $ns,
+				'page_title' => $title,
+			),
+			__METHOD__
+		);
+		$row = $dbr->fetchObject( $result );
+		if ( $row ) {
+			return $row->page_id;
+		} else {
+			# Page not present; either moved or otherwise lost.
+			return false;
+		}
+	}
 	function sanitiseTitle( $ns, $title ) {
 		if( $ns != 0 ) {
 			$title = preg_replace( '/^[^:]*?:/', '', $title );
@@ -554,8 +759,7 @@ class GrabText extends Maintenance {
 		$title = str_replace( ' ', '_', $title );
 		return $title;
 	}
-
 }
 
-$maintClass = 'GrabText';
+$maintClass = 'GrabNewText';
 require_once( RUN_MAINTENANCE_IF_MAIN );
