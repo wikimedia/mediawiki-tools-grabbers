@@ -59,8 +59,8 @@ class GrabNamespaceInfo extends Maintenance {
 		$namespaces = $result['query']['namespaces'];
 		$customNamespaces = array();
 
-		$contentNamespaces = array();	# $wgContentNamespaces[] = 500;
-		$subpageNamespaces = array();	# $wgNamespacesWithSubpages[] = 500;
+		$contentNamespaces = array();
+		$subpageNamespaces = array();
 		foreach( array_keys( $namespaces ) as $ns ) {
 			# Content?
 			if ( isset( $namespaces[$ns]['content'] ) ) {
@@ -71,8 +71,7 @@ class GrabNamespaceInfo extends Maintenance {
 				$subpageNamespaces[] = $ns;
 			}
 			if ( $ns >= 100 ) {
-				$customNamespaces[$ns] = $namespaces[$ns]['canonical']; #name
-				# print "$ns: {$siteinfo['namespaces'][$ns]['canonical']} \n";
+				$customNamespaces[$ns] = $namespaces[$ns]['canonical'];
 			}
 		}
 		$namespaceAliases = array();	# $wgNamespaceAliases['WP'] = NS_PROJECT;
@@ -81,42 +80,44 @@ class GrabNamespaceInfo extends Maintenance {
 		}
 
 		# Show stuff
-		print "# Extra namespaces or some such\n";
+		$this->output( "# Extra namespaces or some such\n" );
 		foreach( array_keys( $customNamespaces ) as $ns ) {
 			$namespaceName = str_replace( ' ', '_', $customNamespaces[$ns] );
-			print '$wgExtraNamespaces[' . $ns . '] = "' . $namespaceName . '";' . "\n";
+			$this->output( '$wgExtraNamespaces[' . $ns . '] = "' . $namespaceName . '";' . "\n" );
 		}
 
 		# Print content namespace configuration if any
 		if ( count( $contentNamespaces ) > 1 ) {
-			print "\n# Content namespaces\n";
-			print '$wgContentNamespaces = array_merge(' . "\n";
-			print "\t" . '$wgContentNamespaces,' . "\n";
-			print "\t" . 'array( ';
-			print $contentNamespaces[1];
+			$this->output( "\n# Content namespaces\n" );
+			$this->output( '$wgContentNamespaces = array_merge(' . "\n" );
+			$this->output( "\t" . '$wgContentNamespaces,' . "\n" );
+			$this->output( "\t" . 'array( ' );
+			$this->output( $contentNamespaces[1] );
 
 			foreach( array_keys( $contentNamespaces ) as $i ) {
 				if ( $i > 1 ) {
-					print ", {$contentNamespaces[$i]}";
+					$this->output( ", {$contentNamespaces[$i]}" );
 				}
 			}
-			print " )\n";
-			print ");\n";
+			$this->output( " )\n" );
+			$this->output( ");\n" );
 		}
 
 		# Print subpage namespace configuration if any
 		# TO IMPLEMENT; currently the common default configuration just assumes all of them
 
 		# Print namespaceAliases if any
-		print "\n# Namespace aliases\n";
-		foreach ( array_keys( $namespaceAliases ) as $nsa ) {
-			# Ignore if image/image talk; that's core
-			if ( $namespaceAliases[$nsa] != 6 && $namespaceAliases[$nsa] != 7 ) {
-				print '$wgNamespaceAliases["' . $nsa . '"] = ' . $namespaceAliases[$nsa] . ';' . "\n";
+		if ( count( $namespaceAliases ) > 2 ) {
+			$this->output( "\n# Namespace aliases\n" );
+			foreach ( array_keys( $namespaceAliases ) as $nsa ) {
+				# Ignore if image/image talk; that's core
+				if ( $namespaceAliases[$nsa] != 6 && $namespaceAliases[$nsa] != 7 ) {
+					$this->output( '$wgNamespaceAliases["' . $nsa . '"] = ' . $namespaceAliases[$nsa] . ';' . "\n" );
+				}
 			}
 		}
 
-		print "\n";
+		$this->output( "\n" );
 	}
 }
 

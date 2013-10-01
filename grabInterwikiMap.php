@@ -20,12 +20,8 @@
  * - Edward Chernenko <edwardspec@gmail.com> (MediaWikiDumper 1.1.5, interwiki.pl)
  */
 
-/**
- * Set the correct include path for PHP so that we can run this script from
- * $IP/extensions/ShoutWikiMaintenance and we don't need to move this file to
- * $IP/maintenance/.
- */
-# ini_set( 'include_path', dirname( __FILE__ ) . '/../../maintenance' );
+# Because we're not in maintenance
+ini_set( 'include_path', dirname( __FILE__ ) . '/../maintenance' );
 
 require_once( 'Maintenance.php' );
 require_once( 'mediawikibot.class.php' );

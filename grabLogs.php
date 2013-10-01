@@ -13,12 +13,8 @@
  * - Edward Chernenko <edwardspec@gmail.com> (MediaWikiDumper 1.1.5, logs.pl)
  */
 
-/**
- * Set the correct include path for PHP so that we can run this script from
- * $IP/extensions/ShoutWikiMaintenance and we don't need to move this file to
- * $IP/maintenance/.
- */
-# ini_set( 'include_path', dirname( __FILE__ ) . '/../../maintenance' );
+# Because we're not in maintenance
+ini_set( 'include_path', dirname( __FILE__ ) . '/../maintenance' );
 
 require_once( 'Maintenance.php' );
 require_once( 'mediawikibot.class.php' );
@@ -42,33 +38,33 @@ class GrabLogs extends Maintenance {
 		}
 		$user = $this->getOption( 'username' );
 		$password = $this->getOption( 'password' );
-		
+
 		$this->output( "Working...\n" );
-		
+
 		# bot class and log in if requested
 		if ( $user && $password ) {
-			$bot = new MediaWikiBot( 
-				$url, 
-				'json', 
-				$user, 
-				$password, 
-				'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:13.0) Gecko/20100101 Firefox/13.0.1' 
+			$bot = new MediaWikiBot(
+				$url,
+				'json',
+				$user,
+				$password,
+				'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:13.0) Gecko/20100101 Firefox/13.0.1'
 			);
 			if ( !$bot->login() ) {
-				print "Logged in as $user...\n";
+				$this->output( "Logged in as $user...\n" );
 			} else {
-				print "WARNING: Failed to log in as $user.\n";
-			}			
+				$this->output( "WARNING: Failed to log in as $user.\n" );
+			}
 		} else {
-			$bot = new MediaWikiBot( 
-				$url, 
-				'json', 
-				'', 
-				'', 
-				'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:13.0) Gecko/20100101 Firefox/13.0.1' 
+			$bot = new MediaWikiBot(
+				$url,
+				'json',
+				'',
+				'',
+				'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:13.0) Gecko/20100101 Firefox/13.0.1'
 			);
 		}
-		
+
 		$params = array(
 			'list' => 'logevents',
 			'lelimit' => 'max',
@@ -96,9 +92,9 @@ class GrabLogs extends Maintenance {
 		$leend = $this->getOption( 'end' );
 		$more = true;
 		$i = 0;
-		
+
+		$this->output( "Fetching log events...\n" );
 		do {
-			$this->output( "Do loop, instance {$i}...\n" );
 			if ( $lestart === null ) {
 				unset( $params['lestart'] );
 			} else {
@@ -128,6 +124,9 @@ class GrabLogs extends Maintenance {
 
 				$more = !( $lestart === null );
 				$i++;
+				if ( $i % 500 == 0 ) {
+					$this->output( "{$i} logs fetched...\n" );
+				}
 			}
 		} while ( $more );
 
@@ -139,8 +138,17 @@ class GrabLogs extends Maintenance {
 
 		$action = $entry['action'];
 
+		# Handler for reveleted stuff or some such
+		if ( !isset( $entry['title'] ) ) {
+			$entry['title'] = 'Title hidden';
+		}
+		if ( !isset( $entry['ns'] ) ) {
+			$entry['ns'] = 0;
+		}
+
 		$title = $entry['title'];
 		$ns = $entry['ns'];
+
 		if( $ns != 0 ) {
 			// HT hexmode & Skizzerz
 			$title = preg_replace( '/^[^:]*?:/', '', $title );
@@ -178,7 +186,7 @@ class GrabLogs extends Maintenance {
 		if( $action == 'patrol' ) {
 			# Parameters: revision id, previous revision id, automatic?
 			$e['params'] = $entry['patrol']['cur'] . "\n" .
-				$entry['patrol']['prev'] . "\n" . 
+				$entry['patrol']['prev'] . "\n" .
 				$entry['patrol']['auto'];
 		} elseif( $action == 'block' || $action == 'reblock' ) {
 			# Parameters: Block expiration, options
@@ -198,7 +206,7 @@ class GrabLogs extends Maintenance {
 				print "$eh: {$entry[$eh]}\n";
 			}
 			$e['params'] =  $entry[0] . "\n" . $entry[1];
-			
+
 		} elseif( $entry['type'] == 'interwiki' ) {
 			# [[Extension:Interwiki]]
 			# Parameters: interwiki prefix, url, transcludable?, local?
@@ -206,16 +214,16 @@ class GrabLogs extends Maintenance {
 			if ( $action == 'iw_add' || $action == 'iw_edit' ) {
 				$e['params'] .=  "\n" . $entry[1] . "\n" . $entry[2] . "\n" . $entry[3];
 			}
-			
+
 		} elseif( $action == 'renameuser' ) {
 			# [[Extension:Renameuser]]
 			# Parameter: new user name
 			$e['params'] = $entry[0];
-			
+
 		} elseif( $action == 'merge' ) {
 			# Parameters: target (merged into), latest revision date
 			$e['params'] = $entry[0] . "\n" . $entry[1];
-			
+
 		} elseif( $entry['type'] == 'protect' && ( $action == 'protect' || $action == 'modify' ) ) {
 			# Parameters: protection type and expiration, cascading options
 			$e['params'] = ( isset( $entry[0] ) ? $entry[0] : '') . ( isset( $entry[1] ) ?  "\n" . $entry[1] : '' );
@@ -230,10 +238,10 @@ class GrabLogs extends Maintenance {
 		wfRestoreWarnings();
 		# Other log types with no specific params as of 1.20:
 		# $entry['type'] = 'delete' (actions: delete, restore)
-		# $action = 'unblock' 
+		# $action = 'unblock'
 		# $action = 'unprotect'
 		# $entry['type'] = 'import' (action: upload (type checking so as not to be confused with downloading files))
-		# $entry['type'] = 'upload' ) (actions: upload, override)
+		# $entry['type'] = 'upload' (actions: upload, override)
 
 		# $this->output( "Going to commit...\n" );
 
@@ -250,22 +258,22 @@ class GrabLogs extends Maintenance {
 			'log_comment' => $e['comment'],
 			'log_params' => $e['params']
 		);
-		
-		# Workaround for revdeleted entries
+
+		# Backup workaround for revdeleted entries
 		try {
 			$dbw->insert( 'logging', $entry, __METHOD__ );
 			$dbw->commit();
 
 			# $this->output( "Changes committed to the database!\n" );
 		} catch ( Exception $e ) {
-			
+
 			foreach ( array_values( $entry ) as $line ) {
 				if ( $line == NULL ) {
-					print "Exception caught; revdeleted entry\n";
+					$this->output( "Exception caught; something exploded\n" );
 					$line = 0;
 				}
 			}
-			
+
 			$dbw->insert( 'logging', $entry, __METHOD__ );
 			$dbw->commit();
 			# $this->output( "Changes committed to the database!\n" );

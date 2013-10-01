@@ -86,7 +86,7 @@ class GrabFiles extends Maintenance {
 		$more = true;
 		$count = 0;
 
-		$this->output( "Processing and downloading  files...\n" );
+		$this->output( "Processing and downloading files...\n" );
 		while ( $more ) {
 			if ( $gaifrom === null ) {
 				unset( $params['gaifrom'] );
@@ -203,7 +203,7 @@ class GrabFiles extends Maintenance {
 					$dbw->insert( 'image', $e, __METHOD__ );
 					$dbw->commit();
 				}
-				
+
 				$urlparts = explode( '/', $fileurl );
 				$urli = count($urlparts);
 
@@ -215,7 +215,7 @@ class GrabFiles extends Maintenance {
 			$fileContent = file_get_contents( $fileurl );
 			wfRestoreWarnings();
 			if ( !$fileContent ) {
-				$this->output( "$fileName not found on remote server.\n" );
+				$this->output( "$name not found on remote server.\n" );
 				continue;
 			}
 
