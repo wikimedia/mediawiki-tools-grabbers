@@ -29,6 +29,7 @@ class GrabLogs extends Maintenance {
 		$this->addOption( 'db', 'Database name, if we don\'t want to write to $wgDBname', false, true );
 		$this->addOption( 'start', 'Start point in crazy zulu format timestamp (2012-11-20T05:28:53Z)', false, true );
 		$this->addOption( 'end', 'Log time at which to stop (in crazy zulu format timestamp)', false, true );
+		$this->addOption( 'carlb', 'Tells the script to use lower api limits', false, false );
 	}
 
 	public function execute() {
@@ -38,6 +39,7 @@ class GrabLogs extends Maintenance {
 		}
 		$user = $this->getOption( 'username' );
 		$password = $this->getOption( 'password' );
+		$carlb = $this->getOption( 'carlb' );
 
 		$this->output( "Working...\n" );
 
@@ -70,6 +72,10 @@ class GrabLogs extends Maintenance {
 			'lelimit' => 'max',
 			'ledir' => 'newer',
 		);
+		if ( $carlb ) {
+			# Tone this down a bit
+			$params['lelimit'] = 100;
+		}
 
 		# A basic normal assortment - skip weird logs like avatars and namespaces
 		$validLogTypes = array(
@@ -139,11 +145,19 @@ class GrabLogs extends Maintenance {
 		$action = $entry['action'];
 
 		# Handler for reveleted stuff or some such
-		if ( !isset( $entry['title'] ) ) {
+		$revdeleted = 0;
+		if ( isset( $entry['actionhidden'] ) ) {
 			$entry['title'] = 'Title hidden';
-		}
-		if ( !isset( $entry['ns'] ) ) {
 			$entry['ns'] = 0;
+			$revdeleted = $revdeleted | LogPage::DELETED_ACTION;
+		}
+		if ( isset( $entry['commenthidden'] ) ) {
+			$entry['comment'] = 'Comment hidden';
+			$revdeleted = $revdeleted | LogPage::DELETED_COMMENT;
+		}
+		if ( isset( $entry['userhidden'] ) ) {
+			$entry['user_text'] = 'User hidden';
+			$revdeleted = $revdeleted | LogPage::DELETED_USER;
 		}
 
 		$title = $entry['title'];
@@ -175,7 +189,7 @@ class GrabLogs extends Maintenance {
 			'page' => $entry['pageid'],
 			'comment' => $wgContLang->truncate( $entry['comment'], 255 ),
 			'params' => '',
-			'deleted' => 0 # Revdeleted
+			'deleted' => $revdeleted # Revdeleted
 		);
 
 		# Get params for logs that use them
