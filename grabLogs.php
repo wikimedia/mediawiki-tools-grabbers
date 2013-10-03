@@ -156,7 +156,7 @@ class GrabLogs extends Maintenance {
 			$revdeleted = $revdeleted | LogPage::DELETED_COMMENT;
 		}
 		if ( isset( $entry['userhidden'] ) ) {
-			$entry['user_text'] = 'User hidden';
+			$entry['user'] = 'User hidden';
 			$revdeleted = $revdeleted | LogPage::DELETED_USER;
 		}
 
