@@ -20,7 +20,10 @@
  * - Edward Chernenko <edwardspec@gmail.com> (MediaWikiDumper 1.1.5, interwiki.pl)
  */
 
-# Because we're in core/grabbers instead of core/maintenance
+/**
+ * Set the correct include path for PHP so that we can run this script from
+ * $IP/grabbers/ and we don't need to move this file to $IP/maintenance/.
+ */
 ini_set( 'include_path', dirname( __FILE__ ) . '/../maintenance' );
 
 require_once( 'Maintenance.php' );
