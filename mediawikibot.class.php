@@ -106,11 +106,11 @@ class MediaWikiBot {
 
 	/** Constructor
 	 */
-	public function __construct( 
+	public function __construct(
 		$url = 'http://example.com/w/api.php',
 		$format = 'php',
-		$username = 'bot', 
-		$password = 'passwd', 
+		$username = 'bot',
+		$password = 'passwd',
 		$useragent = 'WikimediaBot Framework by JKH',
 		$cookies = 'cookies.tmp'
 	) {
@@ -122,7 +122,7 @@ class MediaWikiBot {
 		define( 'PASSWORD', $password );
 		define( 'USERAGENT', $useragent );
 		define( 'COOKIES', $cookies );
-		
+
 	}
 
 	/** Dynamic method server
@@ -204,6 +204,20 @@ class MediaWikiBot {
 		$url = $this->api_url( $method );
 		# get the data
 		$data = $this->curl_post( $url, $params, $multipart );
+		# check data for grabbers; shut up loops are confusing it's too early.
+		if ( !isset( $data[$method] ) ) {
+			echo "API error: no results; retrying in 5s\n";
+			sleep( 5 );
+			$data = $this->curl_post( $url, $params, $multipart );
+			if ( !isset( $data[$method] ) ) {
+				echo "API error: no results; retrying in 30s\n";
+				sleep( 30 );
+				$data = $this->curl_post( $url, $params, $multipart );
+				if ( !isset( $data[$method] ) ) {
+					echo "API error: no results found.\n";
+				}
+			}
+		}
 		# set smwinfo
 		$this->$method = $data;
 		# return the data
@@ -290,7 +304,7 @@ class MediaWikiBot {
 	 */
 	private function urlize_params( $params ) {
 		# url-ify the data for POST
-		$urlstring = '';		
+		$urlstring = '';
 		foreach ( $params as $key => $value ) {
 			$urlstring .= $key . '=' . $value . '&';
 		}

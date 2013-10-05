@@ -11,12 +11,8 @@
  * @date 20 June 2012
  */
 
-/**
- * Set the correct include path for PHP so that we can run this script from
- * $IP/extensions/ShoutWikiMaintenance and we don't need to move this file to
- * $IP/maintenance/.
- */
-# ini_set( 'include_path', dirname( __FILE__ ) . '/../../maintenance' );
+# Because we're in core/grabbers instead of core/maintenance
+ini_set( 'include_path', dirname( __FILE__ ) . '/../maintenance' );
 
 require_once( 'Maintenance.php' );
 

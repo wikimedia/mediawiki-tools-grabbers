@@ -13,7 +13,7 @@
  * - Edward Chernenko <edwardspec@gmail.com> (MediaWikiDumper 1.1.5, logs.pl)
  */
 
-# Because we're not in maintenance
+# Because we're in core/grabbers instead of core/maintenance
 ini_set( 'include_path', dirname( __FILE__ ) . '/../maintenance' );
 
 require_once( 'Maintenance.php' );
@@ -71,6 +71,7 @@ class GrabLogs extends Maintenance {
 			'list' => 'logevents',
 			'lelimit' => 'max',
 			'ledir' => 'newer',
+			'leprop' => 'ids|title|type|user|userid|timestamp|comment|details',
 		);
 		if ( $carlb ) {
 			# Tone this down a bit
@@ -157,6 +158,7 @@ class GrabLogs extends Maintenance {
 		}
 		if ( isset( $entry['userhidden'] ) ) {
 			$entry['user'] = 'User hidden';
+			$entry['userid'] = 0;
 			$revdeleted = $revdeleted | LogPage::DELETED_USER;
 		}
 
@@ -182,7 +184,7 @@ class GrabLogs extends Maintenance {
 			'type' => $entry['type'],
 			'action' => $entry['action'],
 			'timestamp' => $ts,
-			'user' => 0, # Unsassigned
+			'user' => $entry['userid'],
 			'user_text' => $entry['user'],
 			'namespace' => $ns,
 			'title' => $title,

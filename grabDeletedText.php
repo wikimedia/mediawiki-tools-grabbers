@@ -11,7 +11,7 @@
  * @date 1 January 2013
  */
 
-# Because we're not in maintenance
+# Because we're in core/grabbers instead of core/maintenance
 ini_set( 'include_path', dirname( __FILE__ ) . '/../maintenance' );
 
 require_once( 'Maintenance.php' );

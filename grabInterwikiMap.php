@@ -20,7 +20,7 @@
  * - Edward Chernenko <edwardspec@gmail.com> (MediaWikiDumper 1.1.5, interwiki.pl)
  */
 
-# Because we're not in maintenance
+# Because we're in core/grabbers instead of core/maintenance
 ini_set( 'include_path', dirname( __FILE__ ) . '/../maintenance' );
 
 require_once( 'Maintenance.php' );

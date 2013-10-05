@@ -7,7 +7,7 @@
  * @author Kunal Mehta <legoktm@gmail.com>
  */
 
-# Because we're not in maintenance
+# Because we're in core/grabbers instead of core/maintenance
 ini_set( 'include_path', dirname( __FILE__ ) . '/../maintenance' );
 
 require_once( 'Maintenance.php' );

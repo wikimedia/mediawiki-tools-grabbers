@@ -11,7 +11,7 @@
  * @date 1 January 2013
  */
 
-# Because we're not in maintenance
+# Because we're in core/grabbers instead of core/maintenance
 ini_set( 'include_path', dirname( __FILE__ ) . '/../maintenance' );
 
 require_once( 'Maintenance.php' );
@@ -193,7 +193,7 @@ class GrabText extends Maintenance {
 		$localID = $pageID;
 		$titleIsPresent = false;
 
-		$this->output( "Processing page $pageID: $title...\n" );
+		$this->output( "Processing page $pageID: $title\n" );
 
 		# Trim and convert displayed title to database page title
 		if( $ns != 0 ) {
