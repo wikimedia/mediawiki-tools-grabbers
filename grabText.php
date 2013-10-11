@@ -174,7 +174,7 @@ class GrabText extends Maintenance {
 			}
 		}
 
-		# Print skipped lis
+		# Print skipped list
 		$this->output( "\nPage IDs skipped (not found):" );
 		foreach ( $skipped as $pageID ) {
 			$this->output( "$pageID\n" );
@@ -310,7 +310,7 @@ class GrabText extends Maintenance {
 			'prop' => 'revisions',
 			'pageids' => $pageID,
 			'rvlimit' => $rvmax,
-			'rvprop' => 'ids|flags|timestamp|user|userid|comment|content',
+			'rvprop' => 'ids|flags|timestamp|user|userid|comment|content|tags',
 			'rvdir' => 'newer',
 			'rvend' => wfTimestamp( TS_ISO_8601, $endDate )
 		);
@@ -496,9 +496,11 @@ class GrabText extends Maintenance {
 		} else {
 			$comment = '';
 		}
+		$tags = $revision['tags'];
 
 		$e = array(
 			'id' => $revision['revid'],
+			'parent_id' => $revision['parentid'],
 			'page' => $page_id,
 			'text_id' => $this->storeText( $text ),
 			'comment' => $comment,
@@ -512,11 +514,12 @@ class GrabText extends Maintenance {
 		);
 
 		$dbw = wfGetDB( DB_MASTER, array(), $this->getOption( 'db', $wgDBname ) );
-		# $this->output( "Inserting revision {$e['id']}\n" );
+		# insert revisions
 		$dbw->insert(
 			'revision',
 			array(
 				'rev_id' => $e['id'],
+				'rev_parent_id' => $e['parentid'],
 				'rev_page' => $e['page'],
 				'rev_text_id' => $e['text_id'],
 				'rev_comment' => $e['comment'],
@@ -530,6 +533,33 @@ class GrabText extends Maintenance {
 			),
 			__METHOD__
 		);
+		# Insert tags, if any
+		if ( count( $tags ) ) {
+			$tagBlob = '';
+			foreach ( $tags as $tag ) {
+				$dbw->insert(
+					'change_tags',
+					array(
+						'ct_rev_id' => $e['id'],
+						'ct_tag' => $tag,
+					),
+					__METHOD__
+				);
+				if ( $tagBlob == '' ) {
+					$tagBlob = $tag;
+				} else {
+					$tagBlob = "$tagBlob, $tag";
+				}
+			}
+			$dbw->insert(
+				'tag_summary',
+				array(
+					'ts_rev_id' => $e['id'],
+					'ts_tags' => $tagBlob,
+				),
+				__METHOD__
+			);
+		}
 		$dbw->commit();
 
 		return array( $revision['revid'], $e['len'] );
