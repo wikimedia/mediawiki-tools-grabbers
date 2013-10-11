@@ -11,10 +11,7 @@
  * @date 1 January 2013
  */
 
-/**
- * Set the correct include path for PHP so that we can run this script from
- * $IP/grabbers/ and we don't need to move this file to $IP/maintenance/.
- */
+# Because we're not in maintenance
 ini_set( 'include_path', dirname( __FILE__ ) . '/../maintenance' );
 
 require_once( 'Maintenance.php' );
@@ -30,15 +27,16 @@ class GrabText extends Maintenance {
 		$this->addOption( 'db', 'Database name, if we don\'t want to write to $wgDBname', false, true );
 		# $this->addOption( 'start', 'Revision number at which to start', false, true );
 		$this->addOption( 'enddate', 'End point (20121222142317, 2012-12-22T14:23:17T, etc); defaults to current timestamp.', false, true );
+		$this->addOption( 'carlb', 'Tells the script to use lower api limits', false, false );
 	}
 
 	public function execute() {
-		global $bot, $endDate, $wgDBname, $lastRevision;
+		global $bot, $endDate, $wgDBname, $lastRevision, $skipped;
 		$url = $this->getOption( 'url' );
 		if( !$url ) {
 			$this->error( "The URL to the source wiki\'s api.php must be specified!\n", true );
 		}
-		$onlyNamespaces = $this->getOption( 'nsinfo' );
+		$carlb = $this->getOption( 'carlb' );
 
 		$user = $this->getOption( 'username' );
 		$password = $this->getOption( 'password' );
@@ -75,6 +73,7 @@ class GrabText extends Maintenance {
 			);
 		}
 
+		$skipped = array();
 		$pageList = array();
 		$this->output( "\n" );
 
@@ -175,6 +174,12 @@ class GrabText extends Maintenance {
 			}
 		}
 
+		# Print skipped lis
+		$this->output( "\nPage IDs skipped (not found):" );
+		foreach ( $skipped as $pageID ) {
+			$this->output( "$pageID\n" );
+		}
+
 		$this->output( "\n" );
 		# Done.
 	}
@@ -188,7 +193,7 @@ class GrabText extends Maintenance {
 	 *                     defined, protection stuff is skipped.
 	 */
 	function processPage( $page, $start = null ) {
-		global $wgDBname, $bot, $endDate;
+		global $wgDBname, $bot, $endDate, $carlb, $skipped;
 
 		$pageID = $page['pageid'];
 		$title = $page['title'];
@@ -282,7 +287,7 @@ class GrabText extends Maintenance {
 			'counter' => 0,
 			'is_redirect' => ( isset( $page['redirect'] ) ? 1 : 0 ),
 			'is_new' => 0,
-			'random' => rand(),
+			'random' => wfRandom();
 			'touched' => wfTimestampNow(),
 			'len' => $page['length'],
 		);
@@ -295,11 +300,16 @@ class GrabText extends Maintenance {
 		# 'rvcontinue' in 1.20+, 'rvstartid' in 1.19-
 		$rvcontinuename = 'rvcontinue';
 
+		if ( $carlb ) {
+			$rvmax = 10;
+		} else {
+			$rvmax = 'max';
+		}
 
 		$params = array(
 			'prop' => 'revisions',
 			'pageids' => $pageID,
-			'rvlimit' => 'max',
+			'rvlimit' => $rvmax,
 			'rvprop' => 'ids|flags|timestamp|user|userid|comment|content',
 			'rvdir' => 'newer',
 			'rvend' => wfTimestamp( TS_ISO_8601, $endDate )
@@ -316,15 +326,22 @@ class GrabText extends Maintenance {
 
 			$result = $bot->query( $params );
 			if ( isset( $result['query']['pages'] ) ) {
-				$revisions = array_values( $result['query']['pages'] );
-				$revisions = $revisions[0]['revisions'];
-
-				foreach ( $revisions as $revision ) {
-					$last_rev_info = $this->processRevision( $revision, $localID, $last_rev_id );
-				}
+				$last_rev_info = $this->processPageResult( $result, $localID, $last_rev_id );
 			} else {
-				$this->output( "Page id $pageID not found.\n" );
-				return;
+				if ( $params['rvlimit'] == 1 ) {
+					$this->output( "Page id $pageID not found.\n" );
+					return;
+				} else {
+					$params['rvlimit'] = 1;
+					$result = $bot->query( $params );
+					if ( isset( $result['query']['pages'] ) ) {
+						$last_rev_info = $this->processPageResult( $result, $localID, $last_rev_id );
+					} else {
+						$this->output( "Page id $pageID not found.\n" );
+						$skipped[] = $pageID;
+						return;
+					}
+				}
 			}
 			if ( isset( $result['query-continue'] ) ) {
 				# Check name being used - if it's not the set one, reset it
@@ -410,6 +427,20 @@ class GrabText extends Maintenance {
 	}
 
 	/**
+	 * Take the result from revision request and call processRevision
+	 *
+	 */
+	function processPageResult( $result, $localID, $last_rev_id ) {
+		$revisions = array_values( $result['query']['pages'] );
+		$revisions = $revisions[0]['revisions'];
+
+		foreach ( $revisions as $revision ) {
+			$last_rev_info = $this->processRevision( $revision, $localID, $last_rev_id );
+		}
+		return $last_rev_info;
+	}
+
+	/**
 	 * Process an individual page revision.
 	 *
 	 * @param $revision Array: array retrieved from the API, containing the revision
@@ -443,7 +474,7 @@ class GrabText extends Maintenance {
 			$revision['*'] = 'This content has been removed.';
 		}
 
-		# Workaround check if it's already there.
+		# Workaround check if it's already there; disabled for now
 		if ( false ) {
 			$dbr = wfGetDB( DB_SLAVE, array(), $this->getOption( 'db', $wgDBname ) );
 			$result = $dbr->select(
@@ -481,7 +512,7 @@ class GrabText extends Maintenance {
 		);
 
 		$dbw = wfGetDB( DB_MASTER, array(), $this->getOption( 'db', $wgDBname ) );
-		$this->output( "Inserting revision {$e['id']}\n" );
+		# $this->output( "Inserting revision {$e['id']}\n" );
 		$dbw->insert(
 			'revision',
 			array(
