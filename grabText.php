@@ -78,7 +78,7 @@ class GrabText extends Maintenance {
 		$this->output( "\n" );
 
 		# Get all pages as a list, start by getting namespace numbers...
-		$this->output( "Retreiving namespaces list...\n" );
+		$this->output( "Retrieving namespaces list...\n" );
 
 		$params = array(
 			'meta' => 'siteinfo',
@@ -287,7 +287,7 @@ class GrabText extends Maintenance {
 			'counter' => 0,
 			'is_redirect' => ( isset( $page['redirect'] ) ? 1 : 0 ),
 			'is_new' => 0,
-			'random' => wfRandom();
+			'random' => wfRandom(),
 			'touched' => wfTimestampNow(),
 			'len' => $page['length'],
 		);
