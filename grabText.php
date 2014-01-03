@@ -109,7 +109,7 @@ class GrabText extends Maintenance {
 
 		$this->output( "Generating page list - $pageCount expected...\n" );
 		$pageCount = 0;
-		$pageList = array();
+		$doneCount = 0;
 
 		foreach ( $textNamespaces as $ns ) {
 			$nsPageCount = 0;
@@ -137,7 +137,11 @@ class GrabText extends Maintenance {
 
 					$resultsCount = 0;
 					foreach ( $pages as $page ) {
-						$pageList[] = $page;
+						$this->processPage( $page );
+						$doneCount++;
+						if ( $doneCount % 500 === 0 ) {
+							$this->output( "$doneCount\n" );
+						}
 						$resultsCount++;
 					}
 					$nsPageCount += $resultsCount;
@@ -159,20 +163,7 @@ class GrabText extends Maintenance {
 			$this->output( "$nsPageCount pages found in namespace $ns.\n" );
 			$pageCount += $nsPageCount;
 		}
-		$this->output( "\nPage list saved - found $pageCount total pages.\n" );
-		$this->output( "\n" );
-
-		$this->output( "Saving all pages, including text, edit history and protection settings...\n" );
-
-		$currentPage = 0;
-		$this->output( "0 pages committed...\n" );
-		foreach ( $pageList as $page ) {
-			$this->processPage( $page );
-			$currentPage++;
-			if ( $currentPage % 500 == 0 ) {
-				$this->output( "$currentPage\n" );
-			}
-		}
+		$this->output( "\nDone - found $pageCount total pages.\n" );
 
 		# Print skipped list
 		$this->output( "\nPage IDs skipped (not found):" );
