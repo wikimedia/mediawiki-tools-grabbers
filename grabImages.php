@@ -7,8 +7,8 @@
  * @file
  * @ingroup Maintenance
  * @author Jack Phoenix <jack@shoutwiki.com>
- * @version 0.4
- * @date 20 June 2012
+ * @version 0.5
+ * @date 14 June 2015
  */
 
 /**
@@ -75,11 +75,21 @@ class GrabImages extends Maintenance {
 
 		do {
 			if ( $aifrom === null ) {
+				$FUCKING_SECURITY_REDIRECT_BULLSHIT = '';
 				unset( $params['aifrom'] );
 			} else {
+				$FUCKING_SECURITY_REDIRECT_BULLSHIT = '&amp;*';
 				$params['aifrom'] = $aifrom;
 			}
-			$q = $this->getOption( 'url' ) . '?' . wfArrayToCGI( $params );
+			// Anno Domini 2015 and we (who's we?) still give a crap about IE6,
+			// apparently. Giving a crap about ancient IEs also means taking a
+			// dump over my API requests, it seems. Without this fucking bullshit
+			// param in the URL, $result will be the kind of HTML described in
+			// https://phabricator.wikimedia.org/T91439#1085120 instead of the
+			// JSON we're expecting. Lovely. Just fucking lovely.
+			// --an angry ashley on 14 June 2015
+			// @see https://phabricator.wikimedia.org/T91439
+			$q = $this->getOption( 'url' ) . '?' . wfArrayToCGI( $params ) . $FUCKING_SECURITY_REDIRECT_BULLSHIT;
 			$this->output( 'Going to query the URL ' . $q . "\n" );
 			$result = Http::get( $q, 'default',
 				// Fake up the user agent string, just in case...
@@ -115,6 +125,13 @@ class GrabImages extends Maintenance {
 
 				$imgGrabbed += 1;
 
+				// Check for the presence of Wikia's Vignette's parameters and
+				// if they're there, remove 'em to ensure that the files are
+				// saved under their correct names.
+				// @see http://community.wikia.com/wiki/User_blog:Nmonterroso/Introducing_Vignette,_Wikia%27s_New_Thumbnailer
+				if ( preg_match( '/\/revision\/latest\?cb=(.*)$/', $img['url'], $matches ) ) {
+					$img['url'] = preg_replace( '/\/revision\/latest\?cb=(.*)$/', '', $img['url'] );
+				}
 				$this->saveFile( $img['url'] );
 
 				$hash = sha1_file( $folder . '/' . $img['name'] );
