@@ -14,10 +14,10 @@
  * Set the correct include path for PHP so that we can run this script from
  * $IP/grabbers/ and we don't need to move this file to $IP/maintenance/.
  */
-ini_set( 'include_path', dirname( __FILE__ ) . '/../maintenance' );
+ini_set( 'include_path', __DIR__ . '/../maintenance' );
 
-require_once( "Maintenance.php" );
-require_once( "mediawikibot.class.php" );
+require_once 'Maintenance.php';
+require_once 'mediawikibot.class.php';
 
 class GrabNamespaceInfo extends Maintenance {
 	public function __construct() {
@@ -27,9 +27,10 @@ class GrabNamespaceInfo extends Maintenance {
 	}
 
 	public function execute() {
-		global $bot, $wgDBname, $lastRevision;
+		global $bot;
+
 		$url = $this->getOption( 'url' );
-		if( !$url ) {
+		if ( !$url ) {
 			$this->error( "The URL to the source wiki\'s api.php must be specified!\n", true );
 		}
 
@@ -51,6 +52,7 @@ class GrabNamespaceInfo extends Maintenance {
 	# Custom namespaces - make a list as these will need to be added to the localsettings/whatever
 	function parseNamespaces() {
 		global $bot;
+
 		$params = array(
 			'meta' => 'siteinfo',
 			'siprop' => 'namespaces|namespacealiases'
@@ -64,7 +66,7 @@ class GrabNamespaceInfo extends Maintenance {
 
 		$contentNamespaces = array();
 		$subpageNamespaces = array();
-		foreach( array_keys( $namespaces ) as $ns ) {
+		foreach ( array_keys( $namespaces ) as $ns ) {
 			# Content?
 			if ( isset( $namespaces[$ns]['content'] ) ) {
 				$contentNamespaces[] = $ns;
@@ -78,13 +80,13 @@ class GrabNamespaceInfo extends Maintenance {
 			}
 		}
 		$namespaceAliases = array();	# $wgNamespaceAliases['WP'] = NS_PROJECT;
-		foreach( $result['query']['namespacealiases'] as $nsa ) {
+		foreach ( $result['query']['namespacealiases'] as $nsa ) {
 			$namespaceAliases[$nsa['*']] = $nsa['id'];
 		}
 
 		# Show stuff
 		$this->output( "# Extra namespaces or some such\n" );
-		foreach( array_keys( $customNamespaces ) as $ns ) {
+		foreach ( array_keys( $customNamespaces ) as $ns ) {
 			$namespaceName = str_replace( ' ', '_', $customNamespaces[$ns] );
 			$this->output( '$wgExtraNamespaces[' . $ns . '] = "' . $namespaceName . '";' . "\n" );
 		}
@@ -97,7 +99,7 @@ class GrabNamespaceInfo extends Maintenance {
 			$this->output( "\t" . 'array( ' );
 			$this->output( $contentNamespaces[1] );
 
-			foreach( array_keys( $contentNamespaces ) as $i ) {
+			foreach ( array_keys( $contentNamespaces ) as $i ) {
 				if ( $i > 1 ) {
 					$this->output( ", {$contentNamespaces[$i]}" );
 				}
@@ -125,4 +127,4 @@ class GrabNamespaceInfo extends Maintenance {
 }
 
 $maintClass = 'GrabNamespaceInfo';
-require_once( RUN_MAINTENANCE_IF_MAIN );
+require_once RUN_MAINTENANCE_IF_MAIN;

@@ -24,10 +24,10 @@
  * Set the correct include path for PHP so that we can run this script from
  * $IP/grabbers/ and we don't need to move this file to $IP/maintenance/.
  */
-ini_set( 'include_path', dirname( __FILE__ ) . '/../maintenance' );
+ini_set( 'include_path', __DIR__ . '/../maintenance' );
 
-require_once( 'Maintenance.php' );
-require_once( 'mediawikibot.class.php' );
+require_once 'Maintenance.php';
+require_once 'mediawikibot.class.php';
 
 class GrabInterwikiMap extends Maintenance {
 	public function __construct() {
@@ -64,9 +64,9 @@ class GrabInterwikiMap extends Maintenance {
 				'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:13.0) Gecko/20100101 Firefox/13.0.1'
 			);
 			if ( !$bot->login() ) {
-				print "Logged in as $user...\n";
+				$this->output( "Logged in as $user...\n" );
 			} else {
-				print "WARNING: Failed to log in as $user.\n";
+				$this->output( "WARNING: Failed to log in as $user.\n" );
 			}
 		} else {
 			$bot = new MediaWikiBot(
@@ -99,7 +99,7 @@ class GrabInterwikiMap extends Maintenance {
 				continue;
 			}
 			# Check if prefix already exists
-			else if ( $dbw->fetchObject( $dbw->query( "SELECT * FROM `interwiki` WHERE `iw_prefix` = '{$iwEntry['prefix']}'" ) ) ) {
+			elseif ( $dbw->fetchObject( $dbw->query( "SELECT * FROM `interwiki` WHERE `iw_prefix` = '{$iwEntry['prefix']}'" ) ) ) {
 				continue;
 			}
 
@@ -129,4 +129,4 @@ class GrabInterwikiMap extends Maintenance {
 }
 
 $maintClass = 'GrabInterwikiMap';
-require_once( RUN_MAINTENANCE_IF_MAIN );
+require_once RUN_MAINTENANCE_IF_MAIN;

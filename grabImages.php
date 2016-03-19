@@ -15,9 +15,9 @@
  * Set the correct include path for PHP so that we can run this script from
  * $IP/grabbers/ and we don't need to move this file to $IP/maintenance/.
  */
-ini_set( 'include_path', dirname( __FILE__ ) . '/../maintenance' );
+ini_set( 'include_path', __DIR__ . '/../maintenance' );
 
-require_once( 'Maintenance.php' );
+require_once 'Maintenance.php';
 
 class GrabImages extends Maintenance {
 	public function __construct() {
@@ -51,7 +51,7 @@ class GrabImages extends Maintenance {
 		$folder = $this->getWorkingDirectory();
 		wfMkdirParents( $folder );
 
-		if( !file_exists( $folder ) ) {
+		if ( !file_exists( $folder ) ) {
 			$this->error( "Error creating temporary folder {$folder}\n", true );
 			return false;
 		}
@@ -150,7 +150,7 @@ class GrabImages extends Maintenance {
 				$more = !( $aifrom === null );
 				$i++;
 			}
-		} while( $more );
+		} while ( $more );
 
 		if ( $imgGrabbed % 100 == 0 ) {
 			$this->output( 'grabbed: ' . $imgGrabbed . ', errors: ' . ( $imgGrabbed - $imgOK ) . "\n" );
@@ -165,7 +165,7 @@ class GrabImages extends Maintenance {
 			$command = "{$wgPhpCli} {$IP}/maintenance/importImages.php {$folder} {$fileExtensions} --conf {$conf}";
 			$result = wfShellExec( $command, $retval );
 
-			if( $retval ) {
+			if ( $retval ) {
 				$this->output( "importImages script failed - returned value was: $retval\n" );
 				return false;
 			} else {
@@ -181,9 +181,9 @@ class GrabImages extends Maintenance {
 	 * Simple wrapper for Http::get & file_put_content.
 	 * Some basic checking is provided.
 	 *
-	 * @param $url String: image URL
-	 * @param $path String: image local path, if null will take last part of URL
-	 * @return Boolean: status
+	 * @param string $url Image URL
+	 * @param string $path Image local path, if null will take last part of URL
+	 * @return bool Status (true = success, false = failure)
 	 */
 	function saveFile( $url, $path = null ) {
 		if ( is_null( $path ) ) {
@@ -213,7 +213,7 @@ class GrabImages extends Maintenance {
 	 * The wiki's subdomain (e.g. "foo" in "foo.example.com/w/api.php) will
 	 * be used as the directory name.
 	 *
-	 * @return String: path to the place where the images will be stored
+	 * @return string Path to the place where the images will be stored
 	 */
 	function getWorkingDirectory() {
 		// First remove the protocol from the URL...
@@ -224,7 +224,7 @@ class GrabImages extends Maintenance {
 		$workingDirectory = $urlArray[0];
 
 		$retVal = ( wfIsWindows() ?
-			dirname( __FILE__ ) . '/image-grabber/' . $workingDirectory :
+			__DIR__ . '/image-grabber/' . $workingDirectory :
 			'/tmp/image-grabber/' . $workingDirectory );
 
 		return $retVal;
@@ -232,4 +232,4 @@ class GrabImages extends Maintenance {
 }
 
 $maintClass = 'GrabImages';
-require_once( RUN_MAINTENANCE_IF_MAIN );
+require_once RUN_MAINTENANCE_IF_MAIN;

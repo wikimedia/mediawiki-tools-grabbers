@@ -17,10 +17,10 @@
  * Set the correct include path for PHP so that we can run this script from
  * $IP/grabbers/ and we don't need to move this file to $IP/maintenance/.
  */
-ini_set( 'include_path', dirname( __FILE__ ) . '/../maintenance' );
+ini_set( 'include_path', __DIR__ . '/../maintenance' );
 
-require_once( 'Maintenance.php' );
-require_once( 'mediawikibot.class.php' );
+require_once 'Maintenance.php';
+require_once 'mediawikibot.class.php';
 
 class GrabLogs extends Maintenance {
 	public function __construct() {
@@ -32,7 +32,7 @@ class GrabLogs extends Maintenance {
 		$this->addOption( 'db', 'Database name, if we don\'t want to write to $wgDBname', false, true );
 		$this->addOption( 'start', 'Start point in crazy zulu format timestamp (2012-11-20T05:28:53Z)', false, true );
 		$this->addOption( 'end', 'Log time at which to stop (in crazy zulu format timestamp)', false, true );
-		$this->addOption( 'carlb', 'Tells the script to use lower api limits', false, false );
+		$this->addOption( 'carlb', 'Tells the script to use lower API limits', false, false );
 	}
 
 	public function execute() {
@@ -168,14 +168,14 @@ class GrabLogs extends Maintenance {
 		$title = $entry['title'];
 		$ns = $entry['ns'];
 
-		if( $ns != 0 ) {
+		if ( $ns != 0 ) {
 			// HT hexmode & Skizzerz
 			$title = preg_replace( '/^[^:]*?:/', '', $title );
 		}
 		$title = str_replace( ' ', '_', $title );
 
 		$ts = wfTimestamp( TS_MW, $entry['timestamp'] );
-		if( $ts < 20080000000000 && preg_match( '/^Wikia\-/', $entry['user'], $matches ) ) {
+		if ( $ts < 20080000000000 && preg_match( '/^Wikia\-/', $entry['user'], $matches ) ) {
 			# A tiny bug on Wikia in 2006-2007, affects ~10 log entries only
 			if ( isset( $matches[0] ) ) {
 				$entry['user'] = substr( $entry['user'], 0, 6 );
@@ -202,55 +202,51 @@ class GrabLogs extends Maintenance {
 		# Supress warnings because if they're missing, they're missing from the source,
 		# so not our problem
 		wfSuppressWarnings();
-		if( $action == 'patrol' ) {
+		if ( $action == 'patrol' ) {
 			# Parameters: revision id, previous revision id, automatic?
 			$e['params'] = $entry['patrol']['cur'] . "\n" .
 				$entry['patrol']['prev'] . "\n" .
 				$entry['patrol']['auto'];
-		} elseif( $action == 'block' || $action == 'reblock' ) {
+		} elseif ( $action == 'block' || $action == 'reblock' ) {
 			# Parameters: Block expiration, options
 			$e['params'] = $entry['block']['duration'] . "\n" .
 				$entry['block']['flags'];
-		} elseif( $action == 'move' || $action == 'move_redir' ) {
+		} elseif ( $action == 'move' || $action == 'move_redir' ) {
 			# Parameters: Target page title, redirect suppressed?
 			$e['params'] = $entry['move']['new_title'] . "\n";
-			if( isset( $entry['move']['suppressedredirect'] ) ) {
+			if ( isset( $entry['move']['suppressedredirect'] ) ) {
 				# Suppressed redirect.
 				$e['params'] .= '1';
 			}
-		} elseif( $entry['type'] == 'abusefilter' ) {
+		} elseif ( $entry['type'] == 'abusefilter' ) {
 			# [[Extension:AbuseFilter]]
 			# Parameters: filter revision id, filter number
-			foreach( array_keys( $entry ) as $eh ){
-				print "$eh: {$entry[$eh]}\n";
+			foreach ( array_keys( $entry ) as $eh ){
+				$this->output( "$eh: {$entry[$eh]}\n" );
 			}
 			$e['params'] =  $entry[0] . "\n" . $entry[1];
-
-		} elseif( $entry['type'] == 'interwiki' ) {
+		} elseif ( $entry['type'] == 'interwiki' ) {
 			# [[Extension:Interwiki]]
 			# Parameters: interwiki prefix, url, transcludable?, local?
 			$e['params'] = $entry[0];
 			if ( $action == 'iw_add' || $action == 'iw_edit' ) {
 				$e['params'] .=  "\n" . $entry[1] . "\n" . $entry[2] . "\n" . $entry[3];
 			}
-
-		} elseif( $action == 'renameuser' ) {
+		} elseif ( $action == 'renameuser' ) {
 			# [[Extension:Renameuser]]
 			# Parameter: new user name
 			$e['params'] = $entry[0];
-
-		} elseif( $action == 'merge' ) {
+		} elseif ( $action == 'merge' ) {
 			# Parameters: target (merged into), latest revision date
 			$e['params'] = $entry[0] . "\n" . $entry[1];
-
-		} elseif( $entry['type'] == 'protect' && ( $action == 'protect' || $action == 'modify' ) ) {
+		} elseif ( $entry['type'] == 'protect' && ( $action == 'protect' || $action == 'modify' ) ) {
 			# Parameters: protection type and expiration, cascading options
 			$e['params'] = ( isset( $entry[0] ) ? $entry[0] : '') . ( isset( $entry[1] ) ?  "\n" . $entry[1] : '' );
-		} elseif( $action == 'rights' ) {
+		} elseif ( $action == 'rights' ) {
 			# Parameters: old groups, new groups
 			$e['params'] = $entry['rights']['old'] . "\n" .
 				$entry['rights']['new'];
-		} elseif( $entry['type'] == 'newusers' && ( $action == 'create' || $action == 'create2' ) ) {
+		} elseif ( $entry['type'] == 'newusers' && ( $action == 'create' || $action == 'create2' ) ) {
 			# Parameter: new user ID (set to 0; mwauth can change this upon login)
 			$e['params'] = ( isset( $entry[0]['param'] ) ? $entry[0]['param'] : '' );
 		}
@@ -285,9 +281,8 @@ class GrabLogs extends Maintenance {
 
 			# $this->output( "Changes committed to the database!\n" );
 		} catch ( Exception $e ) {
-
 			foreach ( array_values( $entry ) as $line ) {
-				if ( $line == NULL ) {
+				if ( $line == null ) {
 					$this->output( "Exception caught; something exploded\n" );
 					$line = 0;
 				}
@@ -301,4 +296,4 @@ class GrabLogs extends Maintenance {
 }
 
 $maintClass = 'GrabLogs';
-require_once( RUN_MAINTENANCE_IF_MAIN );
+require_once RUN_MAINTENANCE_IF_MAIN;

@@ -12,10 +12,10 @@
  */
 
 # Because we're not in maintenance
-ini_set( 'include_path', dirname( __FILE__ ) . '/../maintenance' );
+ini_set( 'include_path', __DIR__ . '/../maintenance' );
 
-require_once( 'Maintenance.php' );
-require_once( 'mediawikibot.class.php' );
+require_once 'Maintenance.php';
+require_once 'mediawikibot.class.php';
 
 class GrabText extends Maintenance {
 	public function __construct() {
@@ -59,9 +59,9 @@ class GrabText extends Maintenance {
 				'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:13.0) Gecko/20100101 Firefox/13.0.1'
 			);
 			if ( !$bot->login() ) {
-				print "Logged in as $user...\n";
+				$this->output( "Logged in as $user...\n" );
 			} else {
-				print "Warning - failed to log in as $user.\n";
+				$this->output( "Warning - failed to log in as $user.\n" );
 			}
 		} else {
 			$bot = new MediaWikiBot(
@@ -150,7 +150,9 @@ class GrabText extends Maintenance {
 					if ( isset( $result['query-continue'] ) ) {
 						if ( isset( $result['query-continue']['allpages']['gapcontinue'] ) ) {
 							$gapfrom = $result['query-continue']['allpages']['gapcontinue'];
-						} else $gapfrom = $result['query-continue']['allpages']['gapfrom'];
+						} else {
+							$gapfrom = $result['query-continue']['allpages']['gapfrom'];
+						}
 					} else {
 						$gapfrom = null;
 					}
@@ -178,9 +180,9 @@ class GrabText extends Maintenance {
 	/**
 	 * Handle an individual page.
 	 *
-	 * @param $page Array: array retrieved from the API, containing pageid,
+	 * @param array $page Array retrieved from the API, containing pageid,
 	 *                     page title, namespace, protection status and more...
-	 * @param $start Int: timestamp from which to get revisions; if this is
+	 * @param int $start Timestamp from which to get revisions; if this is
 	 *                     defined, protection stuff is skipped.
 	 */
 	function processPage( $page, $start = null ) {
@@ -195,7 +197,7 @@ class GrabText extends Maintenance {
 		$this->output( "Processing page $pageID: $title\n" );
 
 		# Trim and convert displayed title to database page title
-		if( $ns != 0 ) {
+		if ( $ns != 0 ) {
 			$title = preg_replace( '/^[^:]*?:/', '', $title );
 		}
 		$title = str_replace( ' ', '_', $title );
@@ -419,7 +421,6 @@ class GrabText extends Maintenance {
 
 	/**
 	 * Take the result from revision request and call processRevision
-	 *
 	 */
 	function processPageResult( $result, $localID, $last_rev_id ) {
 		$revisions = array_values( $result['query']['pages'] );
@@ -434,11 +435,11 @@ class GrabText extends Maintenance {
 	/**
 	 * Process an individual page revision.
 	 *
-	 * @param $revision Array: array retrieved from the API, containing the revision
+	 * @param array $revision Array retrieved from the API, containing the revision
 	 *                    text, ID, timestamp, whether it was a minor edit or
 	 *                    not and much more
-	 * @param $page_e UNUSED
-	 * @param $prev_rev_id Integer: previous revision ID (revision.rev_parent_id)
+	 * @param int $page_id Page ID
+	 * @param int $prev_rev_id Previous revision ID (revision.rev_parent_id)
 	 */
 	function processRevision( $revision, $page_id, $prev_rev_id ) {
 		global $wgLang, $wgDBname, $lastRevision;
@@ -482,7 +483,7 @@ class GrabText extends Maintenance {
 
 		$text = $revision['*'];
 		$comment = $revision['comment'];
-		if( $comment ) {
+		if ( $comment ) {
 			$comment = $wgLang->truncate( $comment, 255 );
 		} else {
 			$comment = '';
@@ -524,6 +525,7 @@ class GrabText extends Maintenance {
 			),
 			__METHOD__
 		);
+
 		# Insert tags, if any
 		if ( count( $tags ) ) {
 			$tagBlob = '';
@@ -603,7 +605,7 @@ class GrabText extends Maintenance {
 	}
 
 	function sanitiseTitle( $ns, $title ) {
-		if( $ns != 0 ) {
+		if ( $ns != 0 ) {
 			$title = preg_replace( '/^[^:]*?:/', '', $title );
 		}
 		$title = str_replace( ' ', '_', $title );
@@ -613,4 +615,4 @@ class GrabText extends Maintenance {
 }
 
 $maintClass = 'GrabText';
-require_once( RUN_MAINTENANCE_IF_MAIN );
+require_once RUN_MAINTENANCE_IF_MAIN;

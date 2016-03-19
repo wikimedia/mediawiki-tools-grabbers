@@ -14,10 +14,10 @@
  * Set the correct include path for PHP so that we can run this script from
  * $IP/grabbers/ and we don't need to move this file to $IP/maintenance/.
  */
-ini_set( 'include_path', dirname( __FILE__ ) . '/../maintenance' );
+ini_set( 'include_path', __DIR__ . '/../maintenance' );
 
-require_once( 'Maintenance.php' );
-require_once( 'mediawikibot.class.php' );
+require_once 'Maintenance.php';
+require_once 'mediawikibot.class.php';
 
 class GrabFiles extends Maintenance {
 	public function __construct() {
@@ -63,9 +63,9 @@ class GrabFiles extends Maintenance {
 				'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:13.0) Gecko/20100101 Firefox/13.0.1'
 			);
 			if ( !$bot->login() ) {
-				print "Logged in as $user...\n";
+				$this->output( "Logged in as $user...\n" );
 			} else {
-				print "WARNING: Failed to log in as $user.\n";
+				$this->output( "WARNING: Failed to log in as $user.\n" );
 			}
 		} else {
 			$bot = new MediaWikiBot(
@@ -208,7 +208,7 @@ class GrabFiles extends Maintenance {
 				}
 
 				$urlparts = explode( '/', $fileurl );
-				$urli = count($urlparts);
+				$urli = count( $urlparts );
 
 				$fileLocalPath = $wgUploadDirectory . '/' . $urlparts[$urli - 3] . '/' . $urlparts[$urli - 2] . '/' . $name;
 				$fileLocalDir = $wgUploadDirectory . '/' . $urlparts[$urli - 3] . '/' . $urlparts[$urli - 2] . '/';
@@ -241,4 +241,4 @@ class GrabFiles extends Maintenance {
 }
 
 $maintClass = 'GrabFiles';
-require_once( RUN_MAINTENANCE_IF_MAIN );
+require_once RUN_MAINTENANCE_IF_MAIN;

@@ -11,10 +11,10 @@
  * Set the correct include path for PHP so that we can run this script from
  * $IP/grabbers/ and we don't need to move this file to $IP/maintenance/.
  */
-ini_set( 'include_path', dirname( __FILE__ ) . '/../maintenance' );
+ini_set( 'include_path', __DIR__ . '/../maintenance' );
 
-require_once( 'Maintenance.php' );
-require_once( 'mediawikibot.class.php' );
+require_once 'Maintenance.php';
+require_once 'mediawikibot.class.php';
 
 class GrabUserGroups extends Maintenance {
 
@@ -22,7 +22,7 @@ class GrabUserGroups extends Maintenance {
 	 * Groups we don't want to import...
 	 * @var array
 	 */
-	var $badGroups = array( '*', 'user', 'autoconfirmed' );
+	public $badGroups = array( '*', 'user', 'autoconfirmed' );
 
 	public function __construct() {
 		parent::__construct();
@@ -106,7 +106,7 @@ class GrabUserGroups extends Maintenance {
 	}
 
 	/**
-	 * @param $bot MediaWikiBot
+	 * @param MediaWikiBot $bot
 	 * @return array
 	 */
 	public function getGroups( $bot ) {
@@ -127,7 +127,7 @@ class GrabUserGroups extends Maintenance {
 
 	/**
 	 * Batch insert rows
-	 * @param $rows array
+	 * @param array $rows
 	 */
 	public function insertRows( $rows ) {
 		global $wgDBname;
@@ -138,4 +138,4 @@ class GrabUserGroups extends Maintenance {
 }
 
 $maintClass = 'GrabUserGroups';
-require_once( RUN_MAINTENANCE_IF_MAIN );
+require_once RUN_MAINTENANCE_IF_MAIN;

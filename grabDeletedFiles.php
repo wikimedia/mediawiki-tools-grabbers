@@ -14,10 +14,10 @@
  * Set the correct include path for PHP so that we can run this script from
  * $IP/grabbers/ and we don't need to move this file to $IP/maintenance/.
  */
-ini_set( 'include_path', dirname( __FILE__ ) . '/../maintenance' );
+ini_set( 'include_path', __DIR__ . '/../maintenance' );
 
-require_once( 'Maintenance.php' );
-require_once( 'mediawikibot.class.php' );
+require_once 'Maintenance.php';
+require_once 'mediawikibot.class.php';
 
 class GrabDeletedFiles extends Maintenance {
 	public function __construct() {
@@ -33,6 +33,7 @@ class GrabDeletedFiles extends Maintenance {
 
 	public function execute() {
 		global $wgUploadDirectory;
+
 		$url = $this->getOption( 'url' );
 		$imagesurl = $this->getOption( 'imagesurl' );
 		if ( !$url || !$imagesurl ) {
@@ -55,7 +56,7 @@ class GrabDeletedFiles extends Maintenance {
 			'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:13.0) Gecko/20100101 Firefox/13.0.1'
 		);
 		if ( !$bot->login() ) {
-			print "Logged in as $user...\n";
+			$this->output( "Logged in as $user...\n" );
 
 			# Does the user have deletion rights?
 			$params = array(
@@ -165,7 +166,7 @@ class GrabDeletedFiles extends Maintenance {
 			'fa_user_text' => $entry['user'],
 			'fa_timestamp' => wfTimestamp( TS_MW, $entry['timestamp'] ),
 			'fa_storage_group' => 'deleted',
-			'fa_media_type' => NULL,
+			'fa_media_type' => null,
 			'fa_deleted' => 0
 		);
 
@@ -179,9 +180,9 @@ class GrabDeletedFiles extends Maintenance {
 
 		# We could get these other fields from logging, but they appear to have no purpose so SCREW IT.
 		$e['fa_deleted_user'] = 0;
-		$e['fa_deleted_timestamp'] = NULL;
-		$e['fa_deleted_reason'] = NULL;
-		$e['fa_archive_name'] = NULL; # UN:N; mediawiki figures it out anyway.
+		$e['fa_deleted_timestamp'] = null;
+		$e['fa_deleted_reason'] = null;
+		$e['fa_archive_name'] = null; # UN:N; MediaWiki figures it out anyway.
 
 		$dbw = wfGetDB( DB_MASTER, array(), $this->getOption( 'db', $wgDBname ) );
 
@@ -191,7 +192,7 @@ class GrabDeletedFiles extends Maintenance {
 		# $this->output( "Changes committed to the database!\n" );
 	}
 
-	# Base conversion function to make up for php's overwhelming crappiness
+	# Base conversion function to make up for PHP's overwhelming crappiness
 	# (base_convert doesn't work with large numbers)
 	# Borrowed from some guy's comments on php.net...
 	function str_sha1_36( $str ) {
@@ -214,4 +215,4 @@ class GrabDeletedFiles extends Maintenance {
 }
 
 $maintClass = 'GrabDeletedFiles';
-require_once( RUN_MAINTENANCE_IF_MAIN );
+require_once RUN_MAINTENANCE_IF_MAIN;

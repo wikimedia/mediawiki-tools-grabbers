@@ -15,10 +15,10 @@
  * Set the correct include path for PHP so that we can run this script from
  * $IP/grabbers/ and we don't need to move this file to $IP/maintenance/.
  */
-ini_set( 'include_path', dirname( __FILE__ ) . '/../maintenance' );
+ini_set( 'include_path', __DIR__ . '/../maintenance' );
 
-require_once( 'Maintenance.php' );
-require_once( 'mediawikibot.class.php' );
+require_once 'Maintenance.php';
+require_once 'mediawikibot.class.php';
 
 class GrabDeletedText extends Maintenance {
 	public function __construct() {
@@ -31,28 +31,28 @@ class GrabDeletedText extends Maintenance {
 		# $this->addOption( 'start', 'Revision at which to start', false, true );
 		$this->addOption( 'startdate', 'Not yet implemented.', false, true );
 		$this->addOption( 'enddate', 'End point (20121222142317, 2012-12-22T14:23:17T, etc); defaults to current timestamp.', false, true );
-		$this->addOption( 'drcontinue', 'For the idiot brigade, api continue to restart deleted revision process', false, true );
-		$this->addOption( 'carlb', 'Tells the script to use lower api limits', false, false );
+		$this->addOption( 'drcontinue', 'For the idiot brigade, API continue to restart deleted revision process', false, true );
+		$this->addOption( 'carlb', 'Tells the script to use lower API limits', false, false );
 		$this->addOption( 'lasttitle', 'Last title to get; useful for working around content with a namespace/interwiki on top of it in mw1.19-', false, true );
 		$this->addOption( 'badstart', 'Actual start point if bad drcontinues force having to continue from earlier (mw1.19- issue)', false, true );
 		$this->addOption( 'repair', 'Fill in holes in an existing import', false, false );
-
 	}
 
 	public function execute() {
 		global $bot, $endDate, $wgDBname, $lastRevision, $endDate, $lastTitle, $badStart, $repair;
+
 		$repair = $this->getOption( 'repair' );
 		$carlb = $this->getOption( 'carlb' );
 		$lastTitle = $this->getOption( 'lasttitle' );
 		$badStart = $this->getOption( 'badstart' );
 		$url = $this->getOption( 'url' );
-		if( !$url ) {
+		if ( !$url ) {
 			$this->error( "The URL to the source wiki\'s api.php must be specified!\n", true );
 		}
 
 		$user = $this->getOption( 'username' );
 		$password = $this->getOption( 'password' );
-		if( !$user || !$password ) {
+		if ( !$user || !$password ) {
 			$this->error( "An admin username and password are required.\n", true );
 		}
 
@@ -80,7 +80,7 @@ class GrabDeletedText extends Maintenance {
 			'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:13.0) Gecko/20100101 Firefox/13.0.1'
 		);
 		if ( !$bot->login() ) {
-			print "Logged in as $user...\n";
+			$this->output( "Logged in as $user...\n" );
 			# Does the user have deletion rights?
 			$params = array(
 				'list' => 'allusers',
@@ -95,7 +95,6 @@ class GrabDeletedText extends Maintenance {
 		} else {
 			$this->error( "Failed to log in as $user.", true );
 		}
-
 
 		$pageList = array();
 		$this->output( "\n" );
@@ -133,7 +132,7 @@ class GrabDeletedText extends Maintenance {
 		foreach ( $textNamespaces as $ns ) {
 			$more = true;
 			$drcontinue = $this->getOption( 'drcontinue' );
-			if ( !$drcontinue  ) {
+			if ( !$drcontinue ) {
 				$drcontinue = null;
 			} else {
 				# Parse start namespace from input string and use
@@ -146,9 +145,9 @@ class GrabDeletedText extends Maintenance {
 					$nsStart = substr( $drcontinue, 0, $nsStart );
 				}
 				if ( $ns < $nsStart ) {
-					print "Skipping $ns\n";
+					$this->output( "Skipping $ns\n" );
 					continue;
-				} else if ( $nsStart != $ns ) {
+				} elseif ( $nsStart != $ns ) {
 					$drcontinue = null;
 				}
 			}
@@ -175,7 +174,7 @@ class GrabDeletedText extends Maintenance {
 					if ( !$carlb && isset( $params['drcontinue'] ) ) {
 						$oldcontinue = $params['drcontinue'];
 						if ( substr( str_replace( ' ', '_', $drcontinue ), 0, -15 ) < substr( str_replace( ' ', '_', $oldcontinue ), 0, -15 ) ) {
-							$this->error( "Bad drcontinue; " . str_replace( ' ', '_', $drcontinue ) . ' < ' . str_replace( ' ', '_', $oldcontinue ), true );
+							$this->error( 'Bad drcontinue; ' . str_replace( ' ', '_', $drcontinue ) . ' < ' . str_replace( ' ', '_', $oldcontinue ), true );
 						}
 					}
 					$params['drcontinue'] = $drcontinue;
@@ -211,7 +210,6 @@ class GrabDeletedText extends Maintenance {
 		$this->output( "\n" );
 		$this->output( "Saved $revisions_processed deleted revisions.\n" );
 
-
 		# Done.
 	}
 
@@ -219,14 +217,14 @@ class GrabDeletedText extends Maintenance {
 	function storeText( $text ) {
 		global $wgDBname;
 
-		$dbw = wfGetDB( DB_MASTER );
+		$dbw = wfGetDB( DB_MASTER, array(), $this->getOption( 'db', $wgDBname ) );
 		$old_id = $dbw->nextSequenceValue( 'text_old_id_seq' );
 
 		$dbw->insert(
 			'text',
 			array(
 				'old_id' => $old_id,
-				'old_text' =>  $text,
+				'old_text' => $text,
 				'old_flags' => ''
 			),
 			__METHOD__
@@ -239,6 +237,7 @@ class GrabDeletedText extends Maintenance {
 	# Takes results in chunks because that's how the API returns pages - with chunks of revisions.
 	function processDeletedRevisions( $pageChunk, $nsRevisions ) {
 		global $wgContLang, $wgDBname, $endDate, $lastTitle, $badStart, $repair;
+
 		# Go back if we're not actually to the start point yet.
 		if ( $badStart && ( str_replace( ' ', '_', $badStart ) > str_replace( ' ', '_', $pageChunk['title'] ) ) ) {
 			return $nsRevisions;
@@ -334,11 +333,12 @@ class GrabDeletedText extends Maintenance {
 			$nsRevisions++;
 			# $this->output( "Changes committed to the database!\n" );
 		}
+
 		return $nsRevisions;
 	}
 
 	function sanitiseTitle( $ns, $title ) {
-		if( $ns != 0 ) {
+		if ( $ns != 0 ) {
 			$title = preg_replace( '/^[^:]*?:/', '', $title );
 		}
 		$title = str_replace( ' ', '_', $title );
@@ -347,4 +347,4 @@ class GrabDeletedText extends Maintenance {
 }
 
 $maintClass = 'GrabDeletedText';
-require_once( RUN_MAINTENANCE_IF_MAIN );
+require_once RUN_MAINTENANCE_IF_MAIN;

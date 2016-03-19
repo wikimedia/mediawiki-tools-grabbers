@@ -15,10 +15,10 @@
  * Set the correct include path for PHP so that we can run this script from
  * $IP/grabbers/ and we don't need to move this file to $IP/maintenance/.
  */
-ini_set( 'include_path', dirname( __FILE__ ) . '/../maintenance' );
+ini_set( 'include_path', __DIR__ . '/../maintenance' );
 
-require_once( 'Maintenance.php' );
-require_once( 'mediawikibot.class.php' );
+require_once 'Maintenance.php';
+require_once 'mediawikibot.class.php';
 
 class GrabNewText extends Maintenance {
 	public function __construct() {
@@ -34,8 +34,9 @@ class GrabNewText extends Maintenance {
 
 	public function execute() {
 		global $bot, $endDate, $startDate, $wgDBname, $lastRevision;
+
 		$url = $this->getOption( 'url' );
-		if( !$url ) {
+		if ( !$url ) {
 			$this->error( "The URL to the source wiki\'s api.php must be specified!\n", true );
 		}
 
@@ -69,9 +70,9 @@ class GrabNewText extends Maintenance {
 				'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:13.0) Gecko/20100101 Firefox/13.0.1'
 			);
 			if ( !$bot->login() ) {
-				print "Logged in as $user...\n";
+				$this->output( "Logged in as $user...\n" );
 			} else {
-				print "Warning - failed to log in as $user.\n";
+				$this->output( "Warning - failed to log in as $user.\n" );
 			}
 		} else {
 			$bot = new MediaWikiBot(
@@ -94,7 +95,6 @@ class GrabNewText extends Maintenance {
 
 	/**
 	 * Get page edits and creations
-	 *
 	 */
 	function processRecentChanges() {
 		global $wgDBname, $endDate, $startDate, $bot;
@@ -144,11 +144,11 @@ class GrabNewText extends Maintenance {
 
 				$title = $entry['title'];
 				$ns = $entry['ns'];
-				if( $ns != 0 ) {
+				if ( $ns != 0 ) {
 					$title = preg_replace( '/^[^:]*?:/', '', $title );
 				}
 				$title = str_replace( ' ', '_', $title );
-				$listKey = $ns."cowz".$title;
+				$listKey = $ns . 'cowz' . $title;
 
 				if ( in_array( $listKey, $blackList ) ) {
 					# Already done; continue
@@ -183,9 +183,8 @@ class GrabNewText extends Maintenance {
 
 	/**
 	 * Get delete/move/import changes
-	 *
 	 */
-	function processRecentLogs () {
+	function processRecentLogs() {
 		global $bot, $endDate, $wgDBname, $startDate;
 
 		$params = array(
@@ -248,13 +247,11 @@ class GrabNewText extends Maintenance {
 						}
 						$dbw->commit( __METHOD__ );
 
-					}
-					elseif ( $logEntry['action'] ==  'delete' ) {
+					} elseif ( $logEntry['action'] ==  'delete' ) {
 						$this->output( "$ns:$title was deleted; updating....\n" );
 						# Delete our copy, move revisions -> archive
 						$this->updateDeleted( $ns, $title, $dbw );
-					}
-					elseif ( $logEntry['action'] == 'restore' ) {
+					} elseif ( $logEntry['action'] == 'restore' ) {
 						$this->output( "$ns:$title was undeleted; updating....\n" );
 						# Remove any revisions from archive and process as new
 						$page = $this->updateRestored( $ns, $title, $dbw );
@@ -298,9 +295,9 @@ class GrabNewText extends Maintenance {
 	/**
 	 * Handle an individual page.
 	 *
-	 * @param $page Array: array retrieved from the API, containing pageid,
+	 * @param array $page Array retrieved from the API, containing pageid,
 	 *                     page title, namespace, protection status and more...
-	 * @param $start Int: timestamp from which to get revisions; if this is
+	 * @param int|null $start Timestamp from which to get revisions; if this is
 	 *                     defined, protection stuff is skipped.
 	 */
 	function processPage( $page, $start = null ) {
@@ -315,7 +312,7 @@ class GrabNewText extends Maintenance {
 		$this->output( "Processing page $pageID...\n" );
 
 		# Trim and convert displayed title to database page title
-		if( $ns != 0 ) {
+		if ( $ns != 0 ) {
 			$title = preg_replace( '/^[^:]*?:/', '', $title );
 		}
 		$title = str_replace( ' ', '_', $title );
@@ -352,7 +349,7 @@ class GrabNewText extends Maintenance {
 						'page_id',
 						array(),
 						__METHOD__,
-						array( 'ORDER BY' => 'page_id desc' )
+						array( 'ORDER BY' => 'page_id DESC' )
 					);
 					$localID = $resid + 1;
 				}
@@ -410,7 +407,6 @@ class GrabNewText extends Maintenance {
 		$rvcontinue = null;
 		# 'rvcontinue' in 1.20+, 'rvstartid' in 1.19-
 		$rvcontinuename = 'rvcontinue';
-
 
 		$params = array(
 			'prop' => 'revisions',
@@ -501,7 +497,6 @@ class GrabNewText extends Maintenance {
 					__METHOD__
 				);
 			} else {
-
 				$this->output( "Inserting page entry $localID\n" );
 				$dbw->insert(
 					'page',
@@ -522,22 +517,23 @@ class GrabNewText extends Maintenance {
 				);
 			}
 		}
+
 		$dbw->commit();
 	}
 
 	/**
 	 * Process an individual page revision.
 	 *
-	 * @param $revision Array: array retrieved from the API, containing the revision
+	 * @param array $revision Array retrieved from the API, containing the revision
 	 *                    text, ID, timestamp, whether it was a minor edit or
 	 *                    not and much more
-	 * @param $page_e UNUSED
-	 * @param $prev_rev_id Integer: previous revision ID (revision.rev_parent_id)
+	 * @param int $page_id Page ID number
+	 * @param int $prev_rev_id Previous revision ID (revision.rev_parent_id)
 	 */
 	function processRevision( $revision, $page_id, $prev_rev_id ) {
 		global $wgLang, $wgDBname, $lastRevision;
 
-		if ( $revision['revid'] <= $lastRevision) {
+		if ( $revision['revid'] <= $lastRevision ) {
 			# Oops?
 			return false;
 		}
@@ -755,8 +751,9 @@ class GrabNewText extends Maintenance {
 			return false;
 		}
 	}
+
 	function sanitiseTitle( $ns, $title ) {
-		if( $ns != 0 ) {
+		if ( $ns != 0 ) {
 			$title = preg_replace( '/^[^:]*?:/', '', $title );
 		}
 		$title = str_replace( ' ', '_', $title );
@@ -765,4 +762,4 @@ class GrabNewText extends Maintenance {
 }
 
 $maintClass = 'GrabNewText';
-require_once( RUN_MAINTENANCE_IF_MAIN );
+require_once RUN_MAINTENANCE_IF_MAIN;
