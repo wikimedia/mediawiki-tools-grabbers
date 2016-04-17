@@ -135,7 +135,30 @@ class GrabFiles extends Maintenance {
 			if ( !$count && $endDate < wfTimestamp( TS_MW, $fileVersion['timestamp'] ) ) {
 				return 0;
 			}
+
+			# Check for Wikia's videos
+			# This is somewhat dumb as it only checks for YouTube videos, but
+			# without the MIME check it catches .ogv etc.
+			# A better check would be to check the mediatype and for the lack
+			# of a known file extension in the title, but I don't wanna mess
+			# with regex right now. --ashley, 17 April 2016
+			if (
+				$fileVersion['mime'] == 'video/youtube' &&
+				strtoupper( $fileVersion['mediatype'] ) == 'VIDEO'
+			)
+			{
+				$this->output( "...this appears to be a video, skipping it.\n" );
+				continue;
+			}
+
 			$fileurl = $fileVersion['url'];
+			// Check for the presence of Wikia's Vignette's parameters and
+			// if they're there, remove 'em to ensure that the files are
+			// saved under their correct names.
+			// @see http://community.wikia.com/wiki/User_blog:Nmonterroso/Introducing_Vignette,_Wikia%27s_New_Thumbnailer
+			if ( preg_match( '/\/revision\/latest\?cb=(.*)$/', $fileurl, $matches ) ) {
+				$fileurl = preg_replace( '/\/revision\/latest\?cb=(.*)$/', '', $fileurl );
+			}
 
 			if ( isset( $fileVersion['archivename'] ) ) {
 				# Old version
@@ -165,6 +188,9 @@ class GrabFiles extends Maintenance {
 				$dbw->begin();
 				$dbw->insert( 'oldimage', $e, __METHOD__ );
 				$dbw->commit();
+
+				$urlparts = explode( '/', $fileurl );
+				$urli = count( $urlparts );
 
 				$fileLocalPath = $wgUploadDirectory . '/archive/' . $urlparts[$urli - 3] . '/' . $urlparts[$urli - 2] . '/' . $name;
 				$fileLocalDir = $wgUploadDirectory . '/archive/' . $urlparts[$urli - 3] . '/' . $urlparts[$urli - 2] . '/';
