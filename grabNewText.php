@@ -195,6 +195,7 @@ class GrabNewText extends Maintenance {
 		$this->processRecentLogs();
 		$this->processRecentChanges();
 
+		$this->output( "\nDone.\n" );
 		# Done.
 	}
 
@@ -415,6 +416,8 @@ class GrabNewText extends Maintenance {
 	 *     revisions that should be already in the database
 	 */
 	function processPage( $page, $start = null, $skipPrevious = true ) {
+		global $wgContentHandlerUseDB;
+
 		$pageID = $page['pageid'];
 		$pageTitle = null;
 		$pageDesignation = "id $pageID";
@@ -429,7 +432,7 @@ class GrabNewText extends Maintenance {
 		$params = array(
 			'prop' => 'info|revisions',
 			'rvlimit' => 'max',
-			'rvprop' => 'ids|flags|timestamp|user|userid|comment|content',
+			'rvprop' => 'ids|flags|timestamp|user|userid|comment|content|tags',
 			'rvdir' => 'newer',
 			'rvend' => wfTimestamp( TS_ISO_8601, $this->endDate )
 		);
@@ -444,6 +447,9 @@ class GrabNewText extends Maintenance {
 		}
 		if ( $page['protection'] ) {
 			$params['inprop'] = 'protection';
+		}
+		if ( $wgContentHandlerUseDB ) {
+			$params['rvprop'] = $params['rvprop'] . '|contentmodel';
 		}
 
 		$result = $this->bot->query( $params );
@@ -482,6 +488,7 @@ class GrabNewText extends Maintenance {
 			'random' => wfRandom(),
 			'touched' => wfTimestampNow(),
 			'len' => 0,
+			'content_model' => null
 		);
 		# Trim and convert displayed title to database page title
 		# Get it from the returned value from api
@@ -494,6 +501,17 @@ class GrabNewText extends Maintenance {
 		$page_e['len'] = $info_pages[0]['length'];
 		$page_e['counter'] = ( isset( $info_pages[0]['counter'] ) ? $info_pages[0]['counter'] : 0 );
 		$page_e['latest'] = $info_pages[0]['lastrevid'];
+		$defaultModel = null;
+		if ( $wgContentHandlerUseDB && isset( $info_pages[0]['contentmodel'] ) ) {
+			# This would be the most accurate way of getting the content model for a page.
+			# However it calls hooks and can be incredibly slow or cause errors
+			#$defaultModel = ContentHandler::getDefaultModelFor( Title:makeTitle( $page_e['namespace'], $page_e['title'] ) );
+			$defaultModel = MWNamespace::getNamespaceContentModel( $info_pages[0]['ns'] ) || CONTENT_MODEL_WIKITEXT;
+			# Set only if not the default content model
+			if ( $defaultModel != $info_pages[0]['contentmodel'] ) {
+				$page_e['content_model'] = $info_pages[0]['contentmodel'];
+			}
+		}
 
 		# Check if page is present
 		$pageIsPresent = false;
@@ -556,7 +574,7 @@ class GrabNewText extends Maintenance {
 		while ( true ) {
 			foreach ( $info_pages[0]['revisions'] as $revision ) {
 				if ( ! $skipPrevious || $revision['revid'] > $this->lastRevision) {
-					$revisionsProcessed = $this->processRevision( $revision, $pageID ) || $revisionsProcessed;
+					$revisionsProcessed = $this->processRevision( $revision, $pageID, $defaultModel ) || $revisionsProcessed;
 				} else {
 					$this->output( sprintf( "Skipping the processRevision of revision %d minor or equal to the last revision of the database (%d).\n", $revision['revid'], $this->lastRevision ) );
 				}
@@ -592,7 +610,8 @@ class GrabNewText extends Maintenance {
 			'page_random' => $page_e['random'],
 			'page_touched' => $page_e['touched'],
 			'page_latest' => $page_e['latest'],
-			'page_len' => $page_e['len']
+			'page_len' => $page_e['len'],
+			'page_content_model' => $page_e['content_model']
 		);
 		if ( $this->supportsCounters && $page_e['counter'] ) {
 			$insert_fields['page_counter'] = $page_e['counter'];
@@ -625,10 +644,11 @@ class GrabNewText extends Maintenance {
 	 * @param array $revision Array retrieved from the API, containing the revision
 	 *     text, ID, timestamp, whether it was a minor edit or not and much more
 	 * @param int $page_id Page ID number of the revision we are going to insert
+	 * @param string $defaultModel Default content model for this page
 	 * @return bool Whether revision has been inserted or not
 	 */
-	function processRevision( $revision, $page_id ) {
-		global $wgLang;
+	function processRevision( $revision, $page_id, $defaultModel ) {
+		global $wgLang, $wgContentHandlerUseDB;
 		$revid = $revision['revid'];
 
 		# Workaround check if it's already there.
@@ -644,12 +664,37 @@ class GrabNewText extends Maintenance {
 			return false;
 		}
 
-		$text = $revision['*'];
-		$comment = $revision['comment'];
-		if ( $comment ) {
-			$comment = $wgLang->truncate( $comment, 255 );
+		# Sloppy handler for revdeletions; just fills them in with dummy text
+		# and sets bitfield thingy
+		$revdeleted = 0;
+		if ( isset( $revision['userhidden'] ) ) {
+			$revdeleted = $revdeleted | Revision::DELETED_USER;
+			if ( !isset( $revision['user'] )) {
+				$revision['user'] = ''; # username removed
+			}
+			if ( !isset( $revision['userid'] )) {
+				$revision['userid'] = 0;
+			}
+		}
+		if ( isset( $revision['commenthidden'] ) ) {
+			$revdeleted = $revdeleted | Revision::DELETED_COMMENT;
+			$comment = ''; # edit summary removed
 		} else {
-			$comment = '';
+			$comment = $revision['comment'];
+			if ( $comment ) {
+				$comment = $wgLang->truncate( $comment, 255 );
+			} else {
+				$comment = '';
+			}
+		}
+		if ( isset( $revision['texthidden'] ) ) {
+			$revdeleted = $revdeleted | Revision::DELETED_TEXT;
+			$text = ''; # This content has been removed.
+		} else {
+			$text = $revision['*'];
+		}
+		if ( isset ( $revision['suppressed'] ) ) {
+			$revdeleted = $revdeleted | Revision::DELETED_RESTRICTED;
 		}
 
 		$e = array(
@@ -660,15 +705,29 @@ class GrabNewText extends Maintenance {
 			'user_text' => $revision['user'],
 			'timestamp' => wfTimestamp( TS_MW, $revision['timestamp'] ),
 			'minor_edit' => ( isset( $revision['minor'] ) ? 1 : 0 ),
-			'deleted' => 0,	#revdeleted; would need a handler elsewhere for these
+			'deleted' => $revdeleted,
 			'len' => strlen( $text ),
 			'parent_id' => $revision['parentid'],
 			# Do not attempt to get the field from api, because it's not what
 			# you'd expect. See T75411
-			'sha1' => Revision::base36Sha1( $text )
+			'sha1' => Revision::base36Sha1( $text ),
+			'content_model' => null,
+			'content_format' => null
 		);
 
-		$e['text_id'] = $this->storeText( $text, $e['sha1'], $page_id );
+		$e['text_id'] = $this->storeText( $text, $e['sha1'], $page_id, $revid );
+
+		# Set content model
+		if ( $wgContentHandlerUseDB && isset( $revision['contentmodel'] ) ) {
+			# Set only if not the default content model
+			if ( $defaultModel != $revision['contentmodel'] ) {
+				$e['content_model'] = $revision['contentmodel'];
+				$defaultFormat = ContentHandler::getForModelID( $defaultModel )->getDefaultFormat();
+				if ( $defaultFormat != $revision['contentformat'] ) {
+					$e['content_format'] = $revision['contentformat'];
+				}
+			}
+		}
 
 		$insert_fields = array(
 			'rev_id' => $e['id'],
@@ -683,14 +742,39 @@ class GrabNewText extends Maintenance {
 			'rev_len' => $e['len'],
 			'rev_parent_id' => $e['parent_id'],
 			'rev_sha1' => $e['sha1'],
+			'rev_content_model' => $e['content_model'],
+			'rev_content_format' => $e['content_format'],
 		);
 
-		$this->output( "Inserting revision {$e['id']}\n" );
+		$this->output( sprintf( "Inserting revision %s\n", $e['id'] ) );
 		$this->dbw->insert(
 			'revision',
 			$insert_fields,
 			__METHOD__
 		);
+
+		# Insert tags, if any
+		if ( isset( $revision['tags'] ) && count( $revision['tags'] ) > 0 ) {
+			foreach ( $revision['tags'] as $tag ) {
+				$this->dbw->insert(
+					'change_tag',
+					array(
+						'ct_rev_id' => $e['id'],
+						'ct_tag' => $tag,
+					),
+					__METHOD__
+				);
+			}
+			$this->dbw->insert(
+				'tag_summary',
+				array(
+					'ts_rev_id' => $e['id'],
+					'ts_tags' => implode( ',', $revision['tags'] ),
+				),
+				__METHOD__
+			);
+		}
+
 		$this->dbw->commit();
 
 		return true;
@@ -700,33 +784,34 @@ class GrabNewText extends Maintenance {
 	 * Stores revision text in the text table. If the page ID is provided and
 	 * a revision exists with the same text, it will reuse it instead of
 	 * creating a duplicate entry in text table.
+	 * If configured, stores text in external storage
 	 *
 	 * @param string $text Text of the revision to store
 	 * @param string $sha1 computed sha1 of the text
-	 * @param int $pageID page id of the revision
+	 * @param int $pageID page id of the revision, used to return the
+	 *            previous revision text if it's the same (optional)
+	 * @param int $revisionID revision id (optional)
 	 * @return int text id of the inserted text
 	 */
-	function storeText( $text, $sha1, $pageID = 0 ) {
+	function storeText( $text, $sha1, $pageID = 0, $revisionID = 0 ) {
+		global $wgDefaultExternalStore;
+
 		if ( $pageID ) {
 			# Check first if the text already exists on any revision of the current page,
 			# to reuse text rows on page moves, protections, etc
+			# Return the previous revision from that page
 			$row = $this->dbw->selectRow(
-				array( 'revision', 'text' ),
-				array_merge( array( 'rev_text_id' ), Revision::selectTextFields() ),
-				array(
-					'rev_page' => $pageID,
-					'rev_sha1' => $sha1
-				),
+				array( 'revision' ),
+				array( 'rev_id', 'rev_sha1', 'rev_text_id' ),
+				"rev_page = $pageID AND rev_id <= $revisionID",
 				__METHOD__,
-				array(),
 				array(
-					'text' => array( 'INNER JOIN', array( 'old_id=rev_text_id' ) )
+					'LIMIT' => 1,
+					'ORDER BY' => 'rev_id DESC'
 				)
 			);
 
-			# We could have assumed that same sha1 means same text, but let's compare it
-			# anyway just in case
-			if ( $row && Revision::getRevisionText( $row ) === $text ) {
+			if ( $row && $row->rev_sha1 == $sha1 ) {
 				# Return the existing text id instead of creating a new one
 				return $row->rev_text_id;
 			}
@@ -735,6 +820,19 @@ class GrabNewText extends Maintenance {
 		$this->lastTextId++;
 
 		$flags = Revision::compressRevisionText( $text );
+
+		# Write to external storage if required
+		if ( $wgDefaultExternalStore ) {
+			# Store and get the URL
+			$text = ExternalStore::insertToDefault( $text );
+			if ( !$text ) {
+				throw new MWException( "Unable to store text to external storage" );
+			}
+			if ( $flags ) {
+				$flags .= ',';
+			}
+			$flags .= 'external';
+		}
 
 		$e = array(
 			'id' => $this->lastTextId,
@@ -851,7 +949,7 @@ class GrabNewText extends Maintenance {
 		$params = array(
 			'list' => 'deletedrevs',
 			'titles' => (string)$pageTitle,
-			'drprop' => 'revid|parentid|user|userid|comment|minor|len|content',
+			'drprop' => 'revid|parentid|user|userid|comment|minor|len|content|tags',
 			'drlimit' => 'max',
 			'drdir' => 'newer'
 		);
@@ -910,13 +1008,6 @@ class GrabNewText extends Maintenance {
 	 */
 	function processDeletedRevision( $revision, $ns, $title ) {
 		global $wgLang;
-		$text = $revision['*'];
-		$comment = $revision['comment'];
-		if ( $comment ) {
-			$comment = $wgLang->truncate( $comment, 255 );
-		} else {
-			$comment = '';
-		}
 
 		# Check if archived revision is already there to prevent duplicate entries
 		if ( $revision['revid'] ) {
@@ -931,6 +1022,39 @@ class GrabNewText extends Maintenance {
 			}
 		}
 
+		# Sloppy handler for revdeletions; just fills them in with dummy text
+		# and sets bitfield thingy
+		$revdeleted = 0;
+		if ( isset( $revision['userhidden'] ) ) {
+			$revdeleted = $revdeleted | Revision::DELETED_USER;
+			if ( !isset( $revision['user'] )) {
+				$revision['user'] = ''; # username removed
+			}
+			if ( !isset( $revision['userid'] )) {
+				$revision['userid'] = 0;
+			}
+		}
+		if ( isset( $revision['commenthidden'] ) ) {
+			$revdeleted = $revdeleted | Revision::DELETED_COMMENT;
+			$comment = ''; # edit summary removed
+		} else {
+			$comment = $revision['comment'];
+			if ( $comment ) {
+				$comment = $wgLang->truncate( $comment, 255 );
+			} else {
+				$comment = '';
+			}
+		}
+		if ( isset( $revision['texthidden'] ) ) {
+			$revdeleted = $revdeleted | Revision::DELETED_TEXT;
+			$text = ''; # This content has been removed.
+		} else {
+			$text = $revision['*'];
+		}
+		if ( isset ( $revision['suppressed'] ) ) {
+			$revdeleted = $revdeleted | Revision::DELETED_RESTRICTED;
+		}
+
 		$e = array(
 			'ns' => $ns,
 			'title' => $title,
@@ -940,10 +1064,12 @@ class GrabNewText extends Maintenance {
 			'user_text' => $revision['user'],
 			'timestamp' => wfTimestamp( TS_MW, $revision['timestamp'] ),
 			'minor_edit' => ( isset( $revision['minor'] ) ? 1 : 0 ),
-			'deleted' => 0,	#revdeleted; would need a handler elsewhere for these
+			'deleted' => $revdeleted,
 			'len' => strlen( $text ),
 			'parent_id' => $revision['parentid'],
-			'sha1' => Revision::base36Sha1( $text )
+			'sha1' => Revision::base36Sha1( $text ),
+			'content_model' => null, # Content handler not available for deleted revisions
+			'content_format' => null
 		);
 
 		$e['text_id'] = $this->storeText( $text, $e['sha1'] );
@@ -963,14 +1089,39 @@ class GrabNewText extends Maintenance {
 			#'ar_page_id' => NULL, # Not requred and unreliable from api
 			'ar_parent_id' => $e['parent_id'],
 			'ar_sha1' => $e['sha1'],
+			'ar_content_model' => $e['content_model'],
+			'ar_content_format' => $e['content_format']
 		);
 
-		$this->output( "Inserting deleted revision {$e['id']}\n" );
+		$this->output( sprintf( "Inserting deleted revision %s\n", $e['id'] ) );
 		$this->dbw->insert(
 			'archive',
 			$insert_fields,
 			__METHOD__
 		);
+
+		# Insert tags, if any
+		if ( isset( $revision['tags'] ) && count( $revision['tags'] ) > 0 ) {
+			foreach ( $revision['tags'] as $tag ) {
+				$this->dbw->insert(
+					'change_tag',
+					array(
+						'ct_rev_id' => $e['id'],
+						'ct_tag' => $tag,
+					),
+					__METHOD__
+				);
+			}
+			$this->dbw->insert(
+				'tag_summary',
+				array(
+					'ts_rev_id' => $e['id'],
+					'ts_tags' => implode( ',', $revision['tags'] ),
+				),
+				__METHOD__
+			);
+		}
+
 		$this->dbw->commit();
 	}
 

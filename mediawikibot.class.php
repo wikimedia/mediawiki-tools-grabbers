@@ -104,6 +104,10 @@ class MediaWikiBot {
 		'rsd'
 	);
 
+	/** Time in seconds to retry on failure before giving up
+	 */
+	protected $retryTimes = array( 10, 30, 60, 120 );
+
 	/** Constructor
 	 */
 	public function __construct(
@@ -156,8 +160,10 @@ class MediaWikiBot {
 	 *
 	 *  MediaWiki requires a dual login method to confirm authenticity. This
 	 *  entire method takes that into account.
+	 *
+	 *  It returns null if success, or an array on failure
 	 */
-	public function login( $init = null ) {
+	public function login( $init = true ) {
 		# build the url
 		$url = $this->api_url( __FUNCTION__ );
 		# build the params
@@ -167,8 +173,11 @@ class MediaWikiBot {
 			'format' => 'php' # do not change this from php
 		 );
 		# get initial login info
-		if ( $init == null ) {
-			$results = $this->login( true );
+		if ( $init ) {
+			$results = $this->login( false );
+			if ( ! isset( $results['login']['token'] ) ) {
+				return $results;
+			}
 			$results = ( array ) $results;
 		} else {
 			$results = null;
@@ -180,8 +189,8 @@ class MediaWikiBot {
 		# get the data
 		$data = $this->curl_post( $url, $params );
 		# return or set data
-		if ( $data['login']['result'] != "Success" ) {
-			return $data;
+		if ( ! is_array( $data ) && $data['login']['result'] != "Success" ) {
+			return $data || [ 'Unknown error' ];
 		}
 	}
 
@@ -205,16 +214,15 @@ class MediaWikiBot {
 		# get the data
 		$data = $this->curl_post( $url, $params, $multipart );
 		# check data for grabbers; shut up loops are confusing it's too early.
-		if ( !isset( $data[$method] ) ) {
-			echo "API error: no results; retrying in 5s\n";
-			sleep( 5 );
-			$data = $this->curl_post( $url, $params, $multipart );
-			if ( !isset( $data[$method] ) ) {
-				echo "API error: no results; retrying in 30s\n";
-				sleep( 30 );
+		# Note: $data can be an empty array, resulting from api generators returning zero results
+		if ( $data === false ) {
+			for ( $errors = 0; $errors < count( $this->retryTimes ); $errors++) {
+				$seconds = $this->retryTimes[$errors];
+				echo "API error: no results; retrying in {$seconds}s\n";
+				sleep( $seconds );
 				$data = $this->curl_post( $url, $params, $multipart );
-				if ( !isset( $data[$method] ) ) {
-					echo "API error: no results found.\n";
+				if ( $data !== false ) {
+					break;
 				}
 			}
 		}
@@ -236,8 +244,9 @@ class MediaWikiBot {
 		# set the url, number of POST vars, POST data
 		curl_setopt( $ch, CURLOPT_URL, $url );
 		curl_setopt( $ch, CURLOPT_USERAGENT, USERAGENT );
-		curl_setopt( $ch, CURLOPT_RETURNTRANSFER,1 );
-		curl_setopt( $ch, CURLOPT_TIMEOUT, 15 );
+		curl_setopt( $ch, CURLOPT_RETURNTRANSFER, 1 );
+		curl_setopt( $ch, CURLOPT_FAILONERROR, 1 );
+		curl_setopt( $ch, CURLOPT_TIMEOUT, 30 );
 		curl_setopt( $ch, CURLOPT_COOKIEFILE, COOKIES );
 		curl_setopt( $ch, CURLOPT_COOKIEJAR, COOKIES );
 		curl_setopt( $ch, CURLOPT_POST, count( $params ) );
@@ -251,10 +260,14 @@ class MediaWikiBot {
 		}
 		# execute the post
 		$results = curl_exec( $ch );
+		$error = curl_errno( $ch );
+		if ( $error !== 0 ) {
+			echo sprintf( "CURL ERROR: %s\n", curl_error( $ch ) );
+		}
 		# close the connection
 		curl_close( $ch );
 		# return the unserialized results
-		return $this->format_results( $results, $params['format'] );
+		return $error !== 0 ? false : $this->format_results( $results, $params['format'] );
 	}
 
 	/** Check for multipart method
