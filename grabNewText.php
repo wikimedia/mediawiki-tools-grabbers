@@ -877,7 +877,9 @@ class GrabNewText extends Maintenance {
 				'rev_deleted',
 				'rev_len',
 				'rev_parent_id',
-				'rev_sha1'
+				'rev_sha1',
+				'rev_content_model',
+				'rev_content_format'
 			),
 			array( 'rev_page' => $pageID ),
 			__METHOD__
@@ -894,6 +896,8 @@ class GrabNewText extends Maintenance {
 			$e['ar_len'] = $row->rev_len;
 			$e['ar_parent_id'] = $row->rev_parent_id;
 			$e['ar_sha1'] = $row->rev_sha1;
+			$e['ar_content_model'] = $row->rev_content_model;
+			$e['ar_content_format'] = $row->rev_content_format;
 
 			$this->dbw->insert( 'archive', $e, __METHOD__ );
 		}
