@@ -8,7 +8,7 @@
  * @author Jack Phoenix <jack@shoutwiki.com>
  * @author Calimonious the Estrange
  * @author Jesús Martínez <martineznovo@gmail.com>
- * @version 0.7
+ * @version 0.8
  * @date 1 January 2013
  */
 
@@ -57,6 +57,13 @@ class GrabNewText extends Maintenance {
 	 * @var int
 	 */
 	protected $lastTextId = 0;
+
+	/**
+	 * Array of namespaces to grab changes
+	 *
+	 * @var Array
+	 */
+	protected $namespaces = null;
 
 	/**
 	 * Handle to the database connection
@@ -110,6 +117,7 @@ class GrabNewText extends Maintenance {
 		$this->addOption( 'db', 'Database name, if we don\'t want to write to $wgDBname', false, true );
 		$this->addOption( 'startdate', 'Start point (20121222142317, 2012-12-22T14:23:17T, etc); note that this cannot go back further than 1-3 months on most projects.', true, true );
 		$this->addOption( 'enddate', 'End point (20121222142317, 2012-12-22T14:23:17T, etc); defaults to current timestamp. May leave pages in inconsistent state if page moves are involved.', false, true );
+		$this->addOption( 'namespaces', 'A pipe-separated list of namespaces (ID) to grab changes from. Defaults to all namespaces', false, true );
 	}
 
 	public function execute() {
@@ -138,6 +146,10 @@ class GrabNewText extends Maintenance {
 			}
 		} else {
 			$this->endDate = wfTimestampNow();
+		}
+
+		if ( $this->hasOption( 'namespaces' ) ) {
+			$this->namespaces = explode( '|', $this->getOption( 'namespaces' ) );
 		}
 
 		# Get a single DB_MASTER connection
@@ -218,6 +230,9 @@ class GrabNewText extends Maintenance {
 		$rcstart = $this->startDate;
 		$count = 0;
 		$more = true;
+		if ( !is_null( $this->namespaces ) ) {
+			$params['rcnamespace'] = implode( '|', $this->namespaces );
+		}
 
 		$this->output( "Retreiving list of changed pages...\n" );
 		while ( $more ) {
@@ -305,15 +320,21 @@ class GrabNewText extends Maintenance {
 					$ns = $logEntry['ns'];
 					$title = $this->sanitiseTitle( $ns, $title );
 					$sourceTitle = Title::makeTitle( $ns, $title );
+					$newns = -1;
+					if ( $logEntry['type'] == 'move' ) {
+						$newns = $logEntry['move']['new_ns'];
+					}
+					if ( !is_null( $this->namespaces ) && !in_array( $ns, $this->namespaces ) && !in_array( $newns, $this->namespaces ) ) {
+						continue;
+					}
 
 					if ( $logEntry['type'] == 'move' ) {
 						# Move our copy
 						# New title
-						$newns = $logEntry['move']['new_ns'];
 						$newTitle = $this->sanitiseTitle( $newns, $logEntry['move']['new_title'] );
 						$destTitle = Title::makeTitle( $newns, $newTitle );
 
-						$this->output( "$sourceTitle was moved; updating...\n" );
+						$this->output( "$sourceTitle was moved to $destTitle; updating...\n" );
 						$this->processMove( $ns, $title );
 						$this->processMove( $newns, $newTitle );
 
