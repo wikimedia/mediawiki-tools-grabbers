@@ -263,7 +263,7 @@ class GrabDeletedText extends Maintenance {
 			}
 			# If this is a repair run, check if it's already present and skip if it is
 			if ( $repair ) {
-				$dbr = wfGetDB( DB_SLAVE, array(), $this->getOption( 'db', $wgDBname ) );
+				$dbr = wfGetDB( DB_REPLICA, array(), $this->getOption( 'db', $wgDBname ) );
 				$result = $dbr->select(
 					'archive',
 					'ar_title',

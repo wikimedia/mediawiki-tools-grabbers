@@ -197,7 +197,7 @@ class GrabFiles extends Maintenance {
 			} else {
 				# Current version
 				# Check if title is present in database because someone screwed up
-				$dbr = wfGetDB( DB_SLAVE, array(), $this->getOption( 'db', $wgDBname ) );
+				$dbr = wfGetDB( DB_REPLICA, array(), $this->getOption( 'db', $wgDBname ) );
 				$dbr->begin();
 				$result = $dbr->select(
 					'image',

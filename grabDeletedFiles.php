@@ -116,7 +116,7 @@ class GrabDeletedFiles extends Maintenance {
 
 		$this->output( "Downloading files... missing ones may have been deleted, or may be a sign of script failure. You may want to check via Special:Undelete.\n" );
 		$count = 0;
-		$dbr = wfGetDB( DB_SLAVE );
+		$dbr = wfGetDB( DB_REPLICA );
 		$result = $dbr->select(
 			'filearchive',
 			array( 'fa_storage_key', 'fa_name' ),
