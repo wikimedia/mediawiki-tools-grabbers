@@ -6,88 +6,58 @@
  * @file
  * @ingroup Maintenance
  * @author Calimonious the Estrange
+ * @author Jesús Martínez <martineznovo@gmail.com>
  * @date 31 December 2012
+ * @version 1.0
  * @note Based on code by Misza, Jack Phoenix and Edward Chernenko.
  */
 
-/**
- * Set the correct include path for PHP so that we can run this script from
- * $IP/grabbers/ and we don't need to move this file to $IP/maintenance/.
- */
-ini_set( 'include_path', __DIR__ . '/../maintenance' );
+require_once 'includes/FileGrabber.php';
 
-require_once 'Maintenance.php';
-require_once 'mediawikibot.class.php';
+class GrabFiles extends FileGrabber {
 
-class GrabFiles extends Maintenance {
+	/**
+	 * End date
+	 *
+	 * @var MWTimestamp
+	 */
+	protected $endDate;
+
 	public function __construct() {
 		parent::__construct();
-		$this->mDescription = 'Grabs files from a pre-existing wiki into a new wiki. Assumes a normal file hashing structure on each end.';
-		$this->addOption( 'url', 'URL to the target wiki\'s api.php', true /* required? */, true /* withArg */, 'u' );
-		$this->addOption( 'username', 'Username to log into the target wiki', false, true, 'n' );
-		$this->addOption( 'password', 'Password on the target wiki', false, true, 'p' );
-		$this->addOption( 'db', 'Database name, if we don\'t want to write to $wgDBname', false, true );
+		$this->mDescription = 'Grabs files from a pre-existing wiki into a new wiki, using file upload configuration of the local wiki.';
 		$this->addOption( 'from', 'Name of file to start from', false, true );
 		$this->addOption( 'enddate', 'Date after which to ignore new files (20121222142317, 2012-12-22T14:23:17T, etc)', false, true );
 	}
 
 	public function execute() {
-		global $wgUploadDirectory, $endDate;
+		parent::execute();
 
-		$endDate = $this->getOption( 'enddate' );
-		if ( $endDate ) {
-			$endDate = wfTimestamp( TS_MW, $endDate );
-			if ( !$endDate ) {
-				$this->error( "Invalid enddate format.\n", true );
+		$this->endDate = $this->getOption( 'enddate' );
+		if ( $this->endDate ) {
+			$this->endDate = wfTimestamp( TS_MW, $this->endDate );
+			if ( !$this->endDate ) {
+				$this->error( "Invalid enddate format.\n", 1 );
 			}
 		} else {
-			$endDate = wfTimestampNow();
-		}
-
-		$url = $this->getOption( 'url' );
-		if ( !$url ) {
-			$this->error( 'The URL to the target wiki\'s api.php is required.', true );
-		}
-		$user = $this->getOption( 'username' );
-		$password = $this->getOption( 'password' );
-
-		$this->output( "Working...\n" );
-
-		# bot class and log in if requested
-		if ( $user && $password ) {
-			$bot = new MediaWikiBot(
-				$url,
-				'json',
-				$user,
-				$password,
-				'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:13.0) Gecko/20100101 Firefox/13.0.1'
-			);
-			if ( !$bot->login() ) {
-				$this->output( "Logged in as $user...\n" );
-			} else {
-				$this->output( "WARNING: Failed to log in as $user.\n" );
-			}
-		} else {
-			$bot = new MediaWikiBot(
-				$url,
-				'json',
-				'',
-				'',
-				'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:13.0) Gecko/20100101 Firefox/13.0.1'
-			);
+			$this->endDate = wfTimestampNow();
 		}
 
 		$params = array(
 			'generator' => 'allimages',
-			'gailimit' => 500,
+			'gailimit' => 'max',
 			'prop' => 'imageinfo',
 			'iiprop' => 'timestamp|user|userid|comment|url|size|sha1|mime|metadata|archivename|bitdepth|mediatype',
-			'iilimit' => 500
+			'iilimit' => 'max'
 		);
 
 		$gaifrom = $this->getOption( 'from' );
 		$more = true;
 		$count = 0;
+
+		if ( $gaifrom !== null ) {
+			$params['gaifrom'] = $gaifrom;
+		}
 
 		$this->output( "Processing and downloading files...\n" );
 		while ( $more ) {
@@ -96,9 +66,9 @@ class GrabFiles extends Maintenance {
 			} else {
 				$params['gaifrom'] = $gaifrom;
 			}
-			$result = $bot->query( $params );
+			$result = $this->bot->query( $params );
 			if ( empty( $result['query']['pages'] ) ) {
-				$this->error( 'No files found...', true );
+				$this->error( 'No files found...', 1 );
 			}
 
 			foreach ( $result['query']['pages'] as $file ) {
@@ -115,146 +85,53 @@ class GrabFiles extends Maintenance {
 		$this->output( "$count files downloaded.\n" );
 	}
 
+	/**
+	 * Process the information from a given file returned by the api
+	 *
+	 * @param array $entry Page data returned from the api with imageinfo
+	 * @return int Number of image revisions processed.
+	 */
 	function processFile( $entry ) {
-		global $wgDBname, $wgUploadDirectory, $endDate;
-
-		$name = $entry['title'];
-		$name = preg_replace( '/^[^:]*?:/', '', $name );
-		$name = str_replace( ' ', '_', $name );
+		$name = $this->sanitiseTitle( $entry['ns'], $entry['title'] );
 
 		# Check if file already exists.
-		$file = wfFindFile( $name );
-		if ( is_object( $file ) ) {
+		# NOTE: wfFindFile() checks foreign repos too. Use local repo only
+		# newFile skips supression checks
+		$file = $this->localRepo->newFile( $name );
+		if ( $file->exists() ) {
 			return 0;
 		}
 
-		$this->output( "Processing {$entry['title']}: " );
+		$this->output( "Processing {$name}: " );
 		$count = 0;
 
 		foreach ( $entry['imageinfo'] as $fileVersion ) {
-			if ( !$count && $endDate < wfTimestamp( TS_MW, $fileVersion['timestamp'] ) ) {
-				return 0;
+			# Api returns file revisions from new to old.
+			# WARNING: If a new version of a file is uploaded after the start of the script
+			# (or endDate), the file and all its previous revisions would be skipped,
+			# potentially leaving pages that were using the old image with redlinks.
+			# To prevent this, we'll skip only more recent versions, and mark the first
+			# one before the end date as the latest
+			if ( !$count && wfTimestamp( TS_MW, $fileVersion['timestamp'] ) > $this->endDate ) {
+				#return 0;
+				continue;
 			}
 
 			# Check for Wikia's videos
-			# This is somewhat dumb as it only checks for YouTube videos, but
-			# without the MIME check it catches .ogv etc.
-			# A better check would be to check the mediatype and for the lack
-			# of a known file extension in the title, but I don't wanna mess
-			# with regex right now. --ashley, 17 April 2016
-			if (
-				$fileVersion['mime'] == 'video/youtube' &&
-				strtoupper( $fileVersion['mediatype'] ) == 'VIDEO'
-			)
-			{
+			if ( $this->isWikiaVideo( $fileVersion ) ) {
 				$this->output( "...this appears to be a video, skipping it.\n" );
-				continue;
+				return 0;
 			}
 
-			$fileurl = $fileVersion['url'];
-			// Check for the presence of Wikia's Vignette's parameters and
-			// if they're there, remove 'em to ensure that the files are
-			// saved under their correct names.
-			// @see http://community.wikia.com/wiki/User_blog:Nmonterroso/Introducing_Vignette,_Wikia%27s_New_Thumbnailer
-			if ( preg_match( '/\/revision\/latest\?cb=(.*)$/', $fileurl, $matches ) ) {
-				$fileurl = preg_replace( '/\/revision\/latest\?cb=(.*)$/', '', $fileurl );
-			}
-
-			if ( isset( $fileVersion['archivename'] ) ) {
-				# Old version
-				$e = array(
-					'oi_name' => $name,
-					'oi_archive_name' => $fileVersion['archivename'],
-					'oi_size' => $fileVersion['size'],
-					'oi_width' => $fileVersion['width'],
-					'oi_height' => $fileVersion['height'],
-					'oi_bits' => $fileVersion['bitdepth'],
-					'oi_description' => $fileVersion['comment'],
-					'oi_user' => $fileVersion['userid'],
-					'oi_user_text' => $fileVersion['user'],
-					'oi_timestamp' => wfTimestamp( TS_MW, $fileVersion['timestamp'] ),
-					'oi_media_type' => $fileVersion['mediatype'],
-					'oi_deleted' => 0,
-					'oi_sha1' => $fileVersion['sha1'],
-					'oi_metadata' => serialize( $fileVersion['metadata'] )
-				);
-
-				$mime = $fileVersion['mime'];
-				$mimeBreak = strpos( $mime, '/' );
-				$e['oi_major_mime'] = substr( $mime, 0, $mimeBreak );
-				$e['oi_minor_mime'] = substr( $mime, $mimeBreak + 1 );
-
-				$dbw = wfGetDB( DB_MASTER, array(), $this->getOption( 'db', $wgDBname ) );
-				$dbw->begin();
-				$dbw->insert( 'oldimage', $e, __METHOD__ );
-				$dbw->commit();
-
-				$urlparts = explode( '/', $fileurl );
-				$urli = count( $urlparts );
-
-				$fileLocalPath = $wgUploadDirectory . '/archive/' . $urlparts[$urli - 3] . '/' . $urlparts[$urli - 2] . '/' . $name;
-				$fileLocalDir = $wgUploadDirectory . '/archive/' . $urlparts[$urli - 3] . '/' . $urlparts[$urli - 2] . '/';
+			if ( $count > 0 ) {
+				$status = $this->oldUpload( $name, $fileVersion );
 			} else {
-				# Current version
-				# Check if title is present in database because someone screwed up
-				$dbr = wfGetDB( DB_REPLICA, array(), $this->getOption( 'db', $wgDBname ) );
-				$dbr->begin();
-				$result = $dbr->select(
-					'image',
-					'img_name',
-					array( 'img_name' => $name ),
-					__METHOD__
-				);
-				$dbr->commit();
-				if ( !$dbr->fetchObject( $result ) ) {
-					$e = array(
-						'img_name' => $name,
-						'img_size' => $fileVersion['size'],
-						'img_width' => $fileVersion['width'],
-						'img_height' => $fileVersion['height'],
-						'img_metadata' => serialize( $fileVersion['metadata'] ),
-						'img_bits' => $fileVersion['bitdepth'],
-						'img_media_type' => $fileVersion['mediatype'],
-						'img_description' => $fileVersion['comment'],
-						'img_user' => $fileVersion['userid'],
-						'img_user_text' => $fileVersion['user'],
-						'img_timestamp' => wfTimestamp( TS_MW, $fileVersion['timestamp'] ),
-						'img_sha1' => $fileVersion['sha1']
-					);
-
-					$mime = $fileVersion['mime'];
-					$mimeBreak = strpos( $mime, '/' );
-					$e['img_major_mime'] = substr( $mime, 0, $mimeBreak );
-					$e['img_minor_mime'] = substr( $mime, $mimeBreak + 1 );
-
-					$dbw = wfGetDB( DB_MASTER, array(), $this->getOption( 'db', $wgDBname ) );
-
-					$dbw->insert( 'image', $e, __METHOD__ );
-					$dbw->commit();
-				}
-
-				$urlparts = explode( '/', $fileurl );
-				$urli = count( $urlparts );
-
-				$fileLocalPath = $wgUploadDirectory . '/' . $urlparts[$urli - 3] . '/' . $urlparts[$urli - 2] . '/' . $name;
-				$fileLocalDir = $wgUploadDirectory . '/' . $urlparts[$urli - 3] . '/' . $urlparts[$urli - 2] . '/';
+				$status = $this->newUpload( $name, $fileVersion );
 			}
 
-			wfSuppressWarnings();
-			$fileContent = file_get_contents( $fileurl );
-			wfRestoreWarnings();
-			if ( !$fileContent ) {
-				$this->output( "$name not found on remote server.\n" );
-				continue;
+			if ( $status->isOK() ) {
+				$count++;
 			}
-
-			# Directory structure and save
-			if ( !file_exists( $fileLocalDir ) ) {
-				mkdir( $fileLocalDir, 0777, true );
-			}
-			file_put_contents( $fileLocalPath, $fileContent );
-
-			$count++;
 		}
 		if ( $count == 1 ) {
 			$this->output( "1 revision\n" );

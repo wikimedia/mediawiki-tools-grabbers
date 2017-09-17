@@ -8,7 +8,7 @@
  * @author Jack Phoenix <jack@shoutwiki.com>
  * @author Calimonious the Estrange
  * @author Jesús Martínez <martineznovo@gmail.com>
- * @version 0.8
+ * @version 1.0
  * @date 1 January 2013
  */
 
@@ -108,6 +108,13 @@ class GrabNewText extends Maintenance {
 	 */
 	protected $movedTitles = array();
 
+	/**
+	 * The target wiki is on Wikia
+	 *
+	 * @var boolean
+	 */
+	protected $isWikia;
+
 	public function __construct() {
 		parent::__construct();
 		$this->mDescription = "Grab new changes from an external wiki and add it over an imported dump.\nFor use when the available dump is slightly out of date.";
@@ -115,9 +122,10 @@ class GrabNewText extends Maintenance {
 		$this->addOption( 'username', 'Username to log into the target wiki', false, true, 'n' );
 		$this->addOption( 'password', 'Password on the target wiki', false, true, 'p' );
 		$this->addOption( 'db', 'Database name, if we don\'t want to write to $wgDBname', false, true );
-		$this->addOption( 'startdate', 'Start point (20121222142317, 2012-12-22T14:23:17T, etc); note that this cannot go back further than 1-3 months on most projects.', true, true );
-		$this->addOption( 'enddate', 'End point (20121222142317, 2012-12-22T14:23:17T, etc); defaults to current timestamp. May leave pages in inconsistent state if page moves are involved.', false, true );
+		$this->addOption( 'startdate', 'Start point (20121222142317, 2012-12-22T14:23:17T, etc); note that this cannot go back further than 1-3 months on most projects', true, true );
+		$this->addOption( 'enddate', 'End point (20121222142317, 2012-12-22T14:23:17T, etc); defaults to current timestamp. May leave pages in inconsistent state if page moves are involved', false, true );
 		$this->addOption( 'namespaces', 'A pipe-separated list of namespaces (ID) to grab changes from. Defaults to all namespaces', false, true );
+		$this->addOption( 'wikia', 'Set this param if the target wiki is on Wikia, to perform some optimizations', false, false );
 	}
 
 	public function execute() {
@@ -157,6 +165,7 @@ class GrabNewText extends Maintenance {
 
 		# Check if wiki supports page counters (removed from core in 1.25)
 		$this->supportsCounters = $this->dbw->fieldExists( 'page', 'page_counter', __METHOD__ );
+		$this->isWikia = $this->getOption( 'wikia' );
 
 		# Get last revision id to avoid duplicates
 		$this->lastRevision = (int)$this->dbw->selectField(
@@ -291,11 +300,16 @@ class GrabNewText extends Maintenance {
 		$params = array(
 			'list' => 'logevents',
 			'ledir' => 'newer',
-			#letype doesn't accept multiple values. Multiple values work only on wikia but breaks on other standard wikis
-			#'letype' => 'delete|move|import',
 			'lelimit' => 'max',
 			'leend' => $this->endDate
 		);
+
+		if ( $this->isWikia ) {
+			# letype doesn't accept multiple values. Multiple values work only
+			# on wikia but breaks on other standard wikis
+			$params['letype'] = 'delete|upload|move|protect';
+		}
+
 		$lestart = null;
 		$count = 0;
 		$more = true;
@@ -322,7 +336,11 @@ class GrabNewText extends Maintenance {
 					$sourceTitle = Title::makeTitle( $ns, $title );
 					$newns = -1;
 					if ( $logEntry['type'] == 'move' ) {
-						$newns = $logEntry['move']['new_ns'];
+						if ( isset( $logEntry['move'] ) ) {
+							$newns = $logEntry['move']['new_ns'];
+						} else {
+							$newns = $logEntry['params']['target_ns'];
+						}
 					}
 					if ( !is_null( $this->namespaces ) && !in_array( $ns, $this->namespaces ) && !in_array( $newns, $this->namespaces ) ) {
 						continue;
@@ -331,7 +349,11 @@ class GrabNewText extends Maintenance {
 					if ( $logEntry['type'] == 'move' ) {
 						# Move our copy
 						# New title
-						$newTitle = $this->sanitiseTitle( $newns, $logEntry['move']['new_title'] );
+						if ( isset( $logEntry['move'] ) ) {
+							$newTitle = $this->sanitiseTitle( $newns, $logEntry['move']['new_title'] );
+						} else {
+							$newTitle = $this->sanitiseTitle( $newns, $logEntry['params']['target_title'] );
+						}
 						$destTitle = Title::makeTitle( $newns, $newTitle );
 
 						$this->output( "$sourceTitle was moved to $destTitle; updating...\n" );
@@ -346,7 +368,8 @@ class GrabNewText extends Maintenance {
 							if ( ! $pageID ) {
 								# Page may be created and then deleted before we processed recentchanges
 								$this->output( "Page $sourceTitle not found in database, nothing to delete.\n" );
-								# TODO: Get deleted revisions from remote wiki anyway?
+								# Update deleted revisions from remote wiki anyway
+								$this->updateDeletedRevs( $ns, $title );
 							} else {
 								$this->archiveAndDeletePage( $pageID, $ns, $title );
 							}
@@ -403,10 +426,10 @@ class GrabNewText extends Maintenance {
 									array( 'pr_page' => $pageID ),
 									__METHOD__
 								);
-							} else if ( ! in_array( $pageID, $this->pagesProtected ) ) {
+							} elseif ( ! in_array( $pageID, $this->pagesProtected ) ) {
 								$pageInfo['protection'] = true;
 							}
-							$this->processPage( $pageInfo );
+							$this->processPage( $pageInfo, $this->startDate );
 							if ( ! in_array( $pageID, $this->pagesProcessed ) ) {
 								$this->pagesProcessed[] = $pageID;
 							}
@@ -568,26 +591,29 @@ class GrabNewText extends Maintenance {
 			);
 			# insert current restrictions
 			foreach ( $info_pages[0]['protection'] as $prot ) {
-				$e = array(
-					'page' => $pageID,
-					'type' => $prot['type'],
-					'level' => $prot['level'],
-					'cascade' => 0,
-					'user' => null,
-					'expiry' => ( $prot['expiry'] == 'infinity' ? 'infinity' : wfTimestamp( TS_MW, $prot['expiry'] ) )
-				);
-				$this->dbw->insert(
-					'page_restrictions',
-					array(
-						'pr_page' => $e['page'],
-						'pr_type' => $e['type'],
-						'pr_level' => $e['level'],
-						'pr_cascade' => $e['cascade'],
-						'pr_user' => $e['user'],
-						'pr_expiry' => $e['expiry']
-					),
-					__METHOD__
-				);
+				# Skip protections inherited from cascade protections
+				if ( !isset( $prot['source'] ) ) {
+					$e = array(
+						'page' => $pageID,
+						'type' => $prot['type'],
+						'level' => $prot['level'],
+						'cascade' => (int)isset( $prot['cascade'] ),
+						'user' => null,
+						'expiry' => ( $prot['expiry'] == 'infinity' ? 'infinity' : wfTimestamp( TS_MW, $prot['expiry'] ) )
+					);
+					$this->dbw->insert(
+						'page_restrictions',
+						array(
+							'pr_page' => $e['page'],
+							'pr_type' => $e['type'],
+							'pr_level' => $e['level'],
+							'pr_cascade' => $e['cascade'],
+							'pr_user' => $e['user'],
+							'pr_expiry' => $e['expiry']
+						),
+						__METHOD__
+					);
+				}
 			}
 		}
 
@@ -669,7 +695,7 @@ class GrabNewText extends Maintenance {
 	 * @return bool Whether revision has been inserted or not
 	 */
 	function processRevision( $revision, $page_id, $defaultModel ) {
-		global $wgLang, $wgContentHandlerUseDB;
+		global $wgContLang, $wgContentHandlerUseDB;
 		$revid = $revision['revid'];
 
 		# Workaround check if it's already there.
@@ -690,10 +716,10 @@ class GrabNewText extends Maintenance {
 		$revdeleted = 0;
 		if ( isset( $revision['userhidden'] ) ) {
 			$revdeleted = $revdeleted | Revision::DELETED_USER;
-			if ( !isset( $revision['user'] )) {
+			if ( !isset( $revision['user'] ) ) {
 				$revision['user'] = ''; # username removed
 			}
-			if ( !isset( $revision['userid'] )) {
+			if ( !isset( $revision['userid'] ) ) {
 				$revision['userid'] = 0;
 			}
 		}
@@ -703,7 +729,7 @@ class GrabNewText extends Maintenance {
 		} else {
 			$comment = $revision['comment'];
 			if ( $comment ) {
-				$comment = $wgLang->truncate( $comment, 255 );
+				$comment = $wgContLang->truncate( $comment, 255 );
 			} else {
 				$comment = '';
 			}
@@ -1032,7 +1058,7 @@ class GrabNewText extends Maintenance {
 	 * @param string $title Title of the deleted revision
 	 */
 	function processDeletedRevision( $revision, $ns, $title ) {
-		global $wgLang;
+		global $wgContLang;
 
 		# Check if archived revision is already there to prevent duplicate entries
 		if ( $revision['revid'] ) {
@@ -1052,10 +1078,10 @@ class GrabNewText extends Maintenance {
 		$revdeleted = 0;
 		if ( isset( $revision['userhidden'] ) ) {
 			$revdeleted = $revdeleted | Revision::DELETED_USER;
-			if ( !isset( $revision['user'] )) {
+			if ( !isset( $revision['user'] ) ) {
 				$revision['user'] = ''; # username removed
 			}
-			if ( !isset( $revision['userid'] )) {
+			if ( !isset( $revision['userid'] ) ) {
 				$revision['userid'] = 0;
 			}
 		}
@@ -1065,7 +1091,7 @@ class GrabNewText extends Maintenance {
 		} else {
 			$comment = $revision['comment'];
 			if ( $comment ) {
-				$comment = $wgLang->truncate( $comment, 255 );
+				$comment = $wgContLang->truncate( $comment, 255 );
 			} else {
 				$comment = '';
 			}

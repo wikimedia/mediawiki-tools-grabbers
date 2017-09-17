@@ -8,7 +8,7 @@
  * @author Jack Phoenix <jack@shoutwiki.com>
  * @author Calimonious the Estrange
  * @author Jesús Martínez <martineznovo@gmail.com>
- * @version 0.7
+ * @version 1.0
  * @date 1 January 2013
  */
 
@@ -74,7 +74,7 @@ class GrabText extends Maintenance {
 		global $wgDBname;
 
 		$url = $this->getOption( 'url' );
-		if( !$url ) {
+		if ( !$url ) {
 			$this->error( "The URL to the source wiki\'s api.php must be specified!\n", 1 );
 		}
 
@@ -146,6 +146,7 @@ class GrabText extends Maintenance {
 			$this->error( 'No siteinfo data found', 1 );
 		}
 
+		$textNamespaces = array();
 		if ( $this->hasOption( 'namespaces' ) ) {
 			$textNamespaces = explode( '|', $this->getOption( 'namespaces', '' ) );
 			$grabFromAllNamespaces = false;
@@ -180,18 +181,18 @@ class GrabText extends Maintenance {
 		}
 
 		$pageCount = 0;
-
 		foreach ( $textNamespaces as $ns ) {
 			$continueTitle = null;
 			if ( isset( $title ) && ! is_null( $title ) ) {
-				if ( $title->getNamespace() === $ns ) {
-					$continueTitle = $title->getPrefixedText();
+				if ( $title->getNamespace() === (int)$ns ) {
+					# The apfrom parameter doesn't have namespace!!
+					$continueTitle = $title->getText();
 					$title = null;
 				} else {
 					continue;
 				}
 			}
-			$pageCount += $this->processPagesFromNamespace( $ns, $continueTitle );
+			$pageCount += $this->processPagesFromNamespace( (int)$ns, $continueTitle );
 		}
 		$this->output( "\nDone - found $pageCount total pages.\n" );
 		# Done.
@@ -362,7 +363,7 @@ class GrabText extends Maintenance {
 
 		# Update page_restrictions (only if requested)
 		if ( isset( $info_pages[0]['protection'] ) ) {
-			$this->output( "Setting page_restrictions changes on page_id $pageID.\n" );
+			$this->output( "Setting page_restrictions on page_id $pageID.\n" );
 			# Delete first any existing protection
 			$this->dbw->delete(
 				'page_restrictions',
@@ -371,26 +372,29 @@ class GrabText extends Maintenance {
 			);
 			# insert current restrictions
 			foreach ( $info_pages[0]['protection'] as $prot ) {
-				$e = array(
-					'page' => $pageID,
-					'type' => $prot['type'],
-					'level' => $prot['level'],
-					'cascade' => 0,
-					'user' => null,
-					'expiry' => ( $prot['expiry'] == 'infinity' ? 'infinity' : wfTimestamp( TS_MW, $prot['expiry'] ) )
-				);
-				$this->dbw->insert(
-					'page_restrictions',
-					array(
-						'pr_page' => $e['page'],
-						'pr_type' => $e['type'],
-						'pr_level' => $e['level'],
-						'pr_cascade' => $e['cascade'],
-						'pr_user' => $e['user'],
-						'pr_expiry' => $e['expiry']
-					),
-					__METHOD__
-				);
+				# Skip protections inherited from cascade protections
+				if ( !isset( $prot['source'] ) ) {
+					$e = array(
+						'page' => $pageID,
+						'type' => $prot['type'],
+						'level' => $prot['level'],
+						'cascade' => (int)isset( $prot['cascade'] ),
+						'user' => null,
+						'expiry' => ( $prot['expiry'] == 'infinity' ? 'infinity' : wfTimestamp( TS_MW, $prot['expiry'] ) )
+					);
+					$this->dbw->insert(
+						'page_restrictions',
+						array(
+							'pr_page' => $e['page'],
+							'pr_type' => $e['type'],
+							'pr_level' => $e['level'],
+							'pr_cascade' => $e['cascade'],
+							'pr_user' => $e['user'],
+							'pr_expiry' => $e['expiry']
+						),
+						__METHOD__
+					);
+				}
 			}
 		}
 
@@ -468,7 +472,7 @@ class GrabText extends Maintenance {
 	 * @return bool Whether revision has been inserted or not
 	 */
 	function processRevision( $revision, $page_id, $defaultModel ) {
-		global $wgLang, $wgContentHandlerUseDB;
+		global $wgContLang, $wgContentHandlerUseDB;
 		$revid = $revision['revid'];
 
 		# Workaround check if it's already there.
@@ -489,10 +493,10 @@ class GrabText extends Maintenance {
 		$revdeleted = 0;
 		if ( isset( $revision['userhidden'] ) ) {
 			$revdeleted = $revdeleted | Revision::DELETED_USER;
-			if ( !isset( $revision['user'] )) {
+			if ( !isset( $revision['user'] ) ) {
 				$revision['user'] = ''; # username removed
 			}
-			if ( !isset( $revision['userid'] )) {
+			if ( !isset( $revision['userid'] ) ) {
 				$revision['userid'] = 0;
 			}
 		}
@@ -502,7 +506,7 @@ class GrabText extends Maintenance {
 		} else {
 			$comment = $revision['comment'];
 			if ( $comment ) {
-				$comment = $wgLang->truncate( $comment, 255 );
+				$comment = $wgContLang->truncate( $comment, 255 );
 			} else {
 				$comment = '';
 			}

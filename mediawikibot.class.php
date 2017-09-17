@@ -189,8 +189,11 @@ class MediaWikiBot {
 		# get the data
 		$data = $this->curl_post( $url, $params );
 		# return or set data
-		if ( ! is_array( $data ) && $data['login']['result'] != "Success" ) {
-			return $data || [ 'Unknown error' ];
+		if ( ! is_array( $data ) || $data['login']['result'] != "Success" ) {
+			# Stupid, stupid, stupid PHP!!! This returns 1 (converts the expression
+			# to boolean) instead of an array!!!!
+			#return $data || [ 'Unknown error' ];
+			return $data ? $data : [ 'Unknown error' ];
 		}
 	}
 

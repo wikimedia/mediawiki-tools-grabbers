@@ -6,7 +6,7 @@
  * @ingroup Maintenance
  * @author Jack Phoenix <jack@shoutwiki.com>
  * @author Calimonious the Estrange
- * @version 0.6
+ * @version 1.0
  * @date 1 January 2013
  */
 
@@ -66,6 +66,7 @@ class GrabNamespaceInfo extends Maintenance {
 
 		$contentNamespaces = array();
 		$subpageNamespaces = array();
+		$namespaceAliases = array();	# $wgNamespaceAliases['WP'] = NS_PROJECT;
 		foreach ( array_keys( $namespaces ) as $ns ) {
 			# Content?
 			if ( isset( $namespaces[$ns]['content'] ) ) {
@@ -76,10 +77,15 @@ class GrabNamespaceInfo extends Maintenance {
 				$subpageNamespaces[] = $ns;
 			}
 			if ( $ns >= 100 ) {
-				$customNamespaces[$ns] = $namespaces[$ns]['canonical'];
+				$customNamespaces[$ns] = $namespaces[$ns]['*'];
+				# Wikis in languages other than English where the namespaces are
+				# provided by extensions, have localized namespace in *, use it as
+				# the primary name and add canonical as an alias.
+				if ( $namespaces[$ns]['*'] != $namespaces[$ns]['canonical'] ) {
+					$namespaceAliases[$namespaces[$ns]['canonical']] = $ns;
+				}
 			}
 		}
-		$namespaceAliases = array();	# $wgNamespaceAliases['WP'] = NS_PROJECT;
 		foreach ( $result['query']['namespacealiases'] as $nsa ) {
 			$namespaceAliases[$nsa['*']] = $nsa['id'];
 		}
