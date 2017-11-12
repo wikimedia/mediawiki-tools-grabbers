@@ -5,7 +5,7 @@
  *
  * @file
  * @ingroup Maintenance
- * @author Jack Phoenix <jack@countervandalism.net>
+ * @author Jack Phoenix
  * @author Jesús Martínez <martineznovo@gmail.com>
  * @version 1.0
  * @date 28 July 2013
