@@ -514,6 +514,7 @@ class GrabNewFiles extends FileGrabber {
 						}
 					}
 				}
+				$count++;
 			}
 			if ( isset( $result['query-continue'] ) ) {
 				$iistart = $result['query-continue']['imageinfo']['iistart'];
