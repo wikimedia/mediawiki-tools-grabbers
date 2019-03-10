@@ -322,7 +322,7 @@ class MediaWikiBot {
 		# url-ify the data for POST
 		$urlstring = '';
 		foreach ( $params as $key => $value ) {
-			$urlstring .= $key . '=' . $value . '&';
+			$urlstring .= $key . '=' . urlencode( $value ) . '&';
 		}
 		# pull the & off the end
 		rtrim( $urlstring, '&' );
