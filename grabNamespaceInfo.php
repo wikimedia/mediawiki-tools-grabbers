@@ -17,7 +17,7 @@
 ini_set( 'include_path', __DIR__ . '/../maintenance' );
 
 require_once 'Maintenance.php';
-require_once 'mediawikibot.class.php';
+require_once 'includes/mediawikibot.class.php';
 
 class GrabNamespaceInfo extends Maintenance {
 	public function __construct() {
