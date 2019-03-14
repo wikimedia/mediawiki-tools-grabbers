@@ -78,10 +78,10 @@ class GrabInterwikiMap extends Maintenance {
 			);
 		}
 
-		$params = array(
+		$params = [
 			'meta' => 'siteinfo',
 			'siprop' => 'interwikimap'
-		);
+		];
 		$data = $bot->query( $params );
 
 		# No entries -> bail out early
@@ -105,7 +105,7 @@ class GrabInterwikiMap extends Maintenance {
 
 			$dbw->insert(
 				'interwiki',
-				array(
+				[
 					'iw_prefix' => $iwEntry['prefix'],
 					'iw_url' => $iwEntry['url'],
 					# Boolean value indicating whether the wiki is in this project:
@@ -115,7 +115,7 @@ class GrabInterwikiMap extends Maintenance {
 					# New crap, might not exist everywhere:
 					'iw_api' => ( isset( $iwEntry['api'] ) ? $iwEntry['api'] : '' ),
 					'iw_wikiid' => ( isset( $iwEntry['wikiid'] ) ? $iwEntry['wikiid'] : '' ),
-				),
+				],
 				__METHOD__
 			);
 			$this->output( "Inserting {$iwEntry['prefix']} (URL: {$iwEntry['url']}) into the database...\n" );

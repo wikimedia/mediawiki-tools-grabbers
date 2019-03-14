@@ -58,26 +58,28 @@ class GrabDeletedFiles extends Maintenance {
 		if ( !$bot->login() ) {
 			$this->output( "Logged in as $user...\n" );
 
+			# Commented out, this doesn't work on Wikia. Simply let the api
+			# error out on first deletedrevs access
 			# Does the user have deletion rights?
-			$params = array(
-				'list' => 'allusers',
-				'aulimit' => '1',
-				'auprop' => 'rights',
-				'aufrom' => $user
-			);
-			$result = $bot->query( $params );
-			if ( !in_array( 'deletedtext', $result['query']['allusers'][0]['rights'] ) ) {
-				$this->error( "$user does not have required rights to fetch deleted content.", true );
-			}
+			#$params = [
+			#	'list' => 'allusers',
+			#	'aulimit' => '1',
+			#	'auprop' => 'rights',
+			#	'aufrom' => $user
+			#];
+			#$result = $bot->query( $params );
+			#if ( !in_array( 'deletedtext', $result['query']['allusers'][0]['rights'] ) ) {
+			#	$this->error( "$user does not have required rights to fetch deleted content.", true );
+			#}
 		} else {
 			$this->error( "Failed to log in as $user.", true );
 		}
 
-		$params = array(
+		$params = [
 			'list' => 'filearchive',
 			'falimit' => 'max',
 			'faprop' => 'sha1|timestamp|user|size|dimensions|description|mime|metadata|bitdepth'
-		);
+		];
 
 		$fafrom = $this->getOption( 'fafrom' );
 		$more = true;
@@ -119,8 +121,8 @@ class GrabDeletedFiles extends Maintenance {
 		$dbr = wfGetDB( DB_REPLICA );
 		$result = $dbr->select(
 			'filearchive',
-			array( 'fa_storage_key', 'fa_name' ),
-			array(),
+			[ 'fa_storage_key', 'fa_name' ],
+			[],
 			__METHOD__
 		);
 
@@ -155,7 +157,7 @@ class GrabDeletedFiles extends Maintenance {
 	function processFile( $entry ) {
 		global $wgDBname;
 
-		$e = array(
+		$e = [
 			'fa_name' => $entry['name'],
 			'fa_size' => $entry['size'],
 			'fa_width' => $entry['width'],
@@ -168,7 +170,7 @@ class GrabDeletedFiles extends Maintenance {
 			'fa_storage_group' => 'deleted',
 			'fa_media_type' => null,
 			'fa_deleted' => 0
-		);
+		];
 
 		$mime = $entry['mime'];
 		$mimeBreak = strpos( $mime, '/' );
@@ -184,7 +186,7 @@ class GrabDeletedFiles extends Maintenance {
 		$e['fa_deleted_reason'] = null;
 		$e['fa_archive_name'] = null; # UN:N; MediaWiki figures it out anyway.
 
-		$dbw = wfGetDB( DB_MASTER, array(), $this->getOption( 'db', $wgDBname ) );
+		$dbw = wfGetDB( DB_MASTER, [], $this->getOption( 'db', $wgDBname ) );
 
 		$dbw->insert( 'filearchive', $e, __METHOD__ );
 		$dbw->commit();

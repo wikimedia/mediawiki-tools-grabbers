@@ -60,16 +60,16 @@ class GrabImages extends Maintenance {
 		$imgGrabbed = 0;
 		$imgOK = 0;
 
-		$params = array(
+		$params = [
 			'action' => 'query',
 			'format' => 'json',
 			'list' => 'allimages',
 			'aiprop' => 'url|sha1',
 			'ailimit' => '500'
-		);
+		];
 
 		$more = true;
-		$images = array();
+		$images = [];
 
 		$i = 0;
 
@@ -97,7 +97,7 @@ class GrabImages extends Maintenance {
 				// IE-like user agents are blocked from certain pages, "thanks"
 				// to IE6's braindead handling of everything and its security
 				// issues
-				array( 'userAgent' => 'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:13.0) Gecko/20100101 Firefox/13.0.1' )
+				[ 'userAgent' => 'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:13.0) Gecko/20100101 Firefox/13.0.1' ]
 			);
 			$data = json_decode( $result, true );
 

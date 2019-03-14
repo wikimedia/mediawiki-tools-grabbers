@@ -84,14 +84,14 @@ class GrabNewText extends Maintenance {
 	 *
 	 * @var array
 	 */
-	protected $pagesProcessed = array();
+	protected $pagesProcessed = [];
 
 	/**
 	 * A list of page ids already processed for protection
 	 *
 	 * @var array
 	 */
-	protected $pagesProtected = array();
+	protected $pagesProtected = [];
 
 	/**
 	 * Used to know if the current user can see deleted revisions on remote wiki,
@@ -106,7 +106,7 @@ class GrabNewText extends Maintenance {
 	 *
 	 * @var array
 	 */
-	protected $movedTitles = array();
+	protected $movedTitles = [];
 
 	/**
 	 * The target wiki is on Wikia
@@ -161,7 +161,7 @@ class GrabNewText extends Maintenance {
 		}
 
 		# Get a single DB_MASTER connection
-		$this->dbw = wfGetDB( DB_MASTER, array(), $this->getOption( 'db', $wgDBname ) );
+		$this->dbw = wfGetDB( DB_MASTER, [], $this->getOption( 'db', $wgDBname ) );
 
 		# Check if wiki supports page counters (removed from core in 1.25)
 		$this->supportsCounters = $this->dbw->fieldExists( 'page', 'page_counter', __METHOD__ );
@@ -171,18 +171,18 @@ class GrabNewText extends Maintenance {
 		$this->lastRevision = (int)$this->dbw->selectField(
 			'revision',
 			'rev_id',
-			array(),
+			[],
 			__METHOD__,
-			array( 'ORDER BY' => 'rev_id DESC' )
+			[ 'ORDER BY' => 'rev_id DESC' ]
 		);
 
 		# Get last text id
 		$this->lastTextId = (int)$this->dbw->selectField(
 			'text',
 			'old_id',
-			array(),
+			[],
 			__METHOD__,
-			array( 'ORDER BY' => 'old_id DESC' )
+			[ 'ORDER BY' => 'old_id DESC' ]
 		);
 
 		# bot class and log in if requested
@@ -228,14 +228,14 @@ class GrabNewText extends Maintenance {
 		$count = 0;
 
 		# Get edits
-		$params = array(
+		$params = [
 			'list' => 'recentchanges',
 			'rcdir' => 'newer',
 			'rctype' => 'edit|new',
 			'rclimit' => 'max',
 			'rcprop' => 'title|sizes|redirect|ids',
 			'rcend' => $this->endDate
-		);
+		];
 		$rcstart = $this->startDate;
 		$count = 0;
 		$more = true;
@@ -268,12 +268,12 @@ class GrabNewText extends Maintenance {
 				}
 				$this->pagesProcessed[] = $entry['pageid'];
 
-				$pageInfo = array(
+				$pageInfo = [
 					'pageid' => $entry['pageid'],
 					'title' => $entry['title'],
 					'ns' => $ns,
 					'protection' => null,
-				);
+				];
 				if ( in_array( $entry['pageid'], $this->pagesProtected ) ) {
 					$pageInfo['protection'] = true;
 					# Remove from the array so we don't attempt to insert restrictions again
@@ -297,12 +297,12 @@ class GrabNewText extends Maintenance {
 	 * Get delete/move/import changes
 	 */
 	function processRecentLogs() {
-		$params = array(
+		$params = [
 			'list' => 'logevents',
 			'ledir' => 'newer',
 			'lelimit' => 'max',
 			'leend' => $this->endDate
-		);
+		];
 
 		if ( $this->isWikia ) {
 			# letype doesn't accept multiple values. Multiple values work only
@@ -383,12 +383,12 @@ class GrabNewText extends Maintenance {
 						$this->output( "$sourceTitle was undeleted; updating....\n" );
 						# Remove any revisions from archive, and process as new
 						$this->updateRestored( $ns, $title );
-						$pageInfo = array(
+						$pageInfo = [
 							'pageid' => $pageID,
 							'title' => $title,
 							'ns' => $ns,
 							'protection' => true,
-						);
+						];
 						$this->processPage( $pageInfo, null, false );
 						if ( ! in_array( $pageID, $this->pagesProcessed ) ) {
 							$this->pagesProcessed[] = $pageID;
@@ -400,12 +400,12 @@ class GrabNewText extends Maintenance {
 						if ( !$pageID ) {
 							$pageID = null;
 						}
-						$pageInfo = array(
+						$pageInfo = [
 							'pageid' => $pageID,
 							'title' => $title,
 							'ns' => $ns,
 							'protection' => true,
-						);
+						];
 						$this->processPage( $pageInfo );
 						if ( ! in_array( $pageID, $this->pagesProcessed ) ) {
 							$this->pagesProcessed[] = $pageID;
@@ -413,17 +413,17 @@ class GrabNewText extends Maintenance {
 					} elseif ( $logEntry['type'] == 'protect' ) {
 						# Don't bother if there's no pageID
 						if ( $pageID ) {
-							$pageInfo = array(
+							$pageInfo = [
 								'pageid' => $pageID,
 								'title' => $title,
 								'ns' => $ns,
 								'protection' => null,
-							);
+							];
 							if ( $logEntry['action'] == 'unprotect' ) {
 								# Remove protection info
 								$this->dbw->delete(
 									'page_restrictions',
-									array( 'pr_page' => $pageID ),
+									[ 'pr_page' => $pageID ],
 									__METHOD__
 								);
 							} elseif ( ! in_array( $pageID, $this->pagesProtected ) ) {
@@ -473,13 +473,13 @@ class GrabNewText extends Maintenance {
 
 		$this->output( "Processing page $pageDesignation...\n" );
 
-		$params = array(
+		$params = [
 			'prop' => 'info|revisions',
 			'rvlimit' => 'max',
 			'rvprop' => 'ids|flags|timestamp|user|userid|comment|content|tags',
 			'rvdir' => 'newer',
 			'rvend' => wfTimestamp( TS_ISO_8601, $this->endDate )
-		);
+		];
 		if ( $pageID ) {
 			$params['pageids'] = $pageID;
 		} else {
@@ -522,7 +522,7 @@ class GrabNewText extends Maintenance {
 			$pageID = $info_pages[0]['pageid'];
 		}
 
-		$page_e = array(
+		$page_e = [
 			'namespace' => null,
 			'title' => null,
 			'restrictions' => '',
@@ -533,7 +533,7 @@ class GrabNewText extends Maintenance {
 			'touched' => wfTimestampNow(),
 			'len' => 0,
 			'content_model' => null
-		);
+		];
 		# Trim and convert displayed title to database page title
 		# Get it from the returned value from api
 		$page_e['namespace'] = $info_pages[0]['ns'];
@@ -562,7 +562,7 @@ class GrabNewText extends Maintenance {
 		$rowCount = $this->dbw->selectRowCount(
 			'page',
 			'page_id',
-			array( 'page_id' => $pageID ),
+			[ 'page_id' => $pageID ],
 			__METHOD__
 		);
 		if ( $rowCount ) {
@@ -586,31 +586,31 @@ class GrabNewText extends Maintenance {
 			# Delete first any existing protection
 			$this->dbw->delete(
 				'page_restrictions',
-				array( 'pr_page' => $pageID ),
+				[ 'pr_page' => $pageID ],
 				__METHOD__
 			);
 			# insert current restrictions
 			foreach ( $info_pages[0]['protection'] as $prot ) {
 				# Skip protections inherited from cascade protections
 				if ( !isset( $prot['source'] ) ) {
-					$e = array(
+					$e = [
 						'page' => $pageID,
 						'type' => $prot['type'],
 						'level' => $prot['level'],
 						'cascade' => (int)isset( $prot['cascade'] ),
 						'user' => null,
 						'expiry' => ( $prot['expiry'] == 'infinity' ? 'infinity' : wfTimestamp( TS_MW, $prot['expiry'] ) )
-					);
+					];
 					$this->dbw->insert(
 						'page_restrictions',
-						array(
+						[
 							'pr_page' => $e['page'],
 							'pr_type' => $e['type'],
 							'pr_level' => $e['level'],
 							'pr_cascade' => $e['cascade'],
 							'pr_user' => $e['user'],
 							'pr_expiry' => $e['expiry']
-						),
+						],
 						__METHOD__
 					);
 				}
@@ -648,7 +648,7 @@ class GrabNewText extends Maintenance {
 			return;
 		}
 
-		$insert_fields = array(
+		$insert_fields = [
 			'page_namespace' => $page_e['namespace'],
 			'page_title' => $page_e['title'],
 			'page_restrictions' => $page_e['restrictions'],
@@ -659,7 +659,7 @@ class GrabNewText extends Maintenance {
 			'page_latest' => $page_e['latest'],
 			'page_len' => $page_e['len'],
 			'page_content_model' => $page_e['content_model']
-		);
+		];
 		if ( $this->supportsCounters && $page_e['counter'] ) {
 			$insert_fields['page_counter'] = $page_e['counter'];
 		}
@@ -678,7 +678,7 @@ class GrabNewText extends Maintenance {
 			$this->dbw->update(
 				'page',
 				$insert_fields,
-				array( 'page_id' => $pageID ),
+				[ 'page_id' => $pageID ],
 				__METHOD__
 			);
 		}
@@ -702,7 +702,7 @@ class GrabNewText extends Maintenance {
 		$rowCount = $this->dbw->selectRowCount(
 			'revision',
 			'rev_id',
-			array( 'rev_id' => $revid ),
+			[ 'rev_id' => $revid ],
 			__METHOD__
 		);
 		if ( $rowCount ) {
@@ -744,7 +744,7 @@ class GrabNewText extends Maintenance {
 			$revdeleted = $revdeleted | Revision::DELETED_RESTRICTED;
 		}
 
-		$e = array(
+		$e = [
 			'id' => $revid,
 			'page' => $page_id,
 			'comment' => $comment,
@@ -760,7 +760,7 @@ class GrabNewText extends Maintenance {
 			'sha1' => Revision::base36Sha1( $text ),
 			'content_model' => null,
 			'content_format' => null
-		);
+		];
 
 		$e['text_id'] = $this->storeText( $text, $e['sha1'], $page_id, $revid );
 
@@ -776,7 +776,7 @@ class GrabNewText extends Maintenance {
 			}
 		}
 
-		$insert_fields = array(
+		$insert_fields = [
 			'rev_id' => $e['id'],
 			'rev_page' => $e['page'],
 			'rev_text_id' => $e['text_id'],
@@ -791,7 +791,7 @@ class GrabNewText extends Maintenance {
 			'rev_sha1' => $e['sha1'],
 			'rev_content_model' => $e['content_model'],
 			'rev_content_format' => $e['content_format'],
-		);
+		];
 
 		$this->output( sprintf( "Inserting revision %s\n", $e['id'] ) );
 		$this->dbw->insert(
@@ -805,19 +805,19 @@ class GrabNewText extends Maintenance {
 			foreach ( $revision['tags'] as $tag ) {
 				$this->dbw->insert(
 					'change_tag',
-					array(
+					[
 						'ct_rev_id' => $e['id'],
 						'ct_tag' => $tag,
-					),
+					],
 					__METHOD__
 				);
 			}
 			$this->dbw->insert(
 				'tag_summary',
-				array(
+				[
 					'ts_rev_id' => $e['id'],
 					'ts_tags' => implode( ',', $revision['tags'] ),
-				),
+				],
 				__METHOD__
 			);
 		}
@@ -848,14 +848,14 @@ class GrabNewText extends Maintenance {
 			# to reuse text rows on page moves, protections, etc
 			# Return the previous revision from that page
 			$row = $this->dbw->selectRow(
-				array( 'revision' ),
-				array( 'rev_id', 'rev_sha1', 'rev_text_id' ),
+				[ 'revision' ],
+				[ 'rev_id', 'rev_sha1', 'rev_text_id' ],
 				"rev_page = $pageID AND rev_id <= $revisionID",
 				__METHOD__,
-				array(
+				[
 					'LIMIT' => 1,
 					'ORDER BY' => 'rev_id DESC'
-				)
+				]
 			);
 
 			if ( $row && $row->rev_sha1 == $sha1 ) {
@@ -881,19 +881,19 @@ class GrabNewText extends Maintenance {
 			$flags .= 'external';
 		}
 
-		$e = array(
+		$e = [
 			'id' => $this->lastTextId,
 			'text' => $text,
 			'flags' => $flags
-		);
+		];
 
 		$this->dbw->insert(
 			'text',
-			array(
+			[
 				'old_id' => $e['id'],
 				'old_text' => $e['text'],
 				'old_flags' => $e['flags']
-			),
+			],
 			__METHOD__
 		);
 
@@ -904,16 +904,16 @@ class GrabNewText extends Maintenance {
 	 * Copies revisions to archive and then deletes the page and revisions
 	 */
 	function archiveAndDeletePage( $pageID, $ns, $title ) {
-		$e = array(
+		$e = [
 			'ar_page_id' => $pageID,
 			'ar_namespace' => $ns,
 			'ar_title' => $title
-		);
+		];
 
 		# Get and insert revision data
 		$result = $this->dbw->select(
 			'revision',
-			array(
+			[
 				'rev_comment',
 				'rev_user',
 				'rev_user_text',
@@ -927,8 +927,8 @@ class GrabNewText extends Maintenance {
 				'rev_sha1',
 				'rev_content_model',
 				'rev_content_format'
-			),
-			array( 'rev_page' => $pageID ),
+			],
+			[ 'rev_page' => $pageID ],
 			__METHOD__
 		);
 		foreach ( $result as $row ) {
@@ -952,18 +952,18 @@ class GrabNewText extends Maintenance {
 		# Delete page and revision entries
 		$this->dbw->delete(
 			'page',
-			array( 'page_id' => $pageID ),
+			[ 'page_id' => $pageID ],
 			__METHOD__
 		);
 		$this->dbw->delete(
 			'revision',
-			array( 'rev_page' => $pageID ),
+			[ 'rev_page' => $pageID ],
 			__METHOD__
 		);
 		# Also delete any restrictions
 		$this->dbw->delete(
 			'page_restrictions',
-			array( 'pr_page' => $pageID ),
+			[ 'pr_page' => $pageID ],
 			__METHOD__
 		);
 		# Full clean up in general database rebuild.
@@ -974,10 +974,10 @@ class GrabNewText extends Maintenance {
 		# Delete existing deleted revisions for page
 		$this->dbw->delete(
 			'archive',
-			array(
+			[
 				'ar_title' => $title,
 				'ar_namespace' => $ns
-			),
+			],
 			__METHOD__
 		);
 		$this->updateDeletedRevs( $ns, $title );
@@ -997,13 +997,13 @@ class GrabNewText extends Maintenance {
 			return;
 		}
 
-		$params = array(
+		$params = [
 			'list' => 'deletedrevs',
 			'titles' => (string)$pageTitle,
 			'drprop' => 'revid|parentid|user|userid|comment|minor|len|content|tags',
 			'drlimit' => 'max',
 			'drdir' => 'newer'
-		);
+		];
 
 		$result = $this->bot->query( $params );
 
@@ -1065,7 +1065,7 @@ class GrabNewText extends Maintenance {
 			$count = $this->dbw->selectRowCount(
 				'archive',
 				'1',
-				array( 'ar_rev_id' => $revision['revid'] ),
+				[ 'ar_rev_id' => $revision['revid'] ],
 				__METHOD__
 			);
 			if ( $count > 0 ) {
@@ -1106,7 +1106,7 @@ class GrabNewText extends Maintenance {
 			$revdeleted = $revdeleted | Revision::DELETED_RESTRICTED;
 		}
 
-		$e = array(
+		$e = [
 			'ns' => $ns,
 			'title' => $title,
 			'id' => $revision['revid'],
@@ -1121,11 +1121,11 @@ class GrabNewText extends Maintenance {
 			'sha1' => Revision::base36Sha1( $text ),
 			'content_model' => null, # Content handler not available for deleted revisions
 			'content_format' => null
-		);
+		];
 
 		$e['text_id'] = $this->storeText( $text, $e['sha1'] );
 
-		$insert_fields = array(
+		$insert_fields = [
 			'ar_namespace' => $ns,
 			'ar_title' => $title,
 			'ar_rev_id' => $e['id'],
@@ -1142,7 +1142,7 @@ class GrabNewText extends Maintenance {
 			'ar_sha1' => $e['sha1'],
 			'ar_content_model' => $e['content_model'],
 			'ar_content_format' => $e['content_format']
-		);
+		];
 
 		$this->output( sprintf( "Inserting deleted revision %s\n", $e['id'] ) );
 		$this->dbw->insert(
@@ -1156,19 +1156,19 @@ class GrabNewText extends Maintenance {
 			foreach ( $revision['tags'] as $tag ) {
 				$this->dbw->insert(
 					'change_tag',
-					array(
+					[
 						'ct_rev_id' => $e['id'],
 						'ct_tag' => $tag,
-					),
+					],
 					__METHOD__
 				);
 			}
 			$this->dbw->insert(
 				'tag_summary',
-				array(
+				[
 					'ts_rev_id' => $e['id'],
 					'ts_tags' => implode( ',', $revision['tags'] ),
-				),
+				],
 				__METHOD__
 			);
 		}
@@ -1186,10 +1186,10 @@ class GrabNewText extends Maintenance {
 		if ( $pageID ) {
 			# There's a local page at the given title
 			# Check if page exists on remote wiki
-			$params = array(
+			$params = [
 				'prop' => 'info',
 				'pageids' => $pageID
-			);
+			];
 			$result = $this->bot->query( $params );
 
 			if ( ! $result || isset( $result['error'] ) ) {
@@ -1224,20 +1224,20 @@ class GrabNewText extends Maintenance {
 					Title::makeTitle( $remotePageNs, $remotePageTitle ) ) );
 				$this->dbw->update(
 					'page',
-					array(
+					[
 						'page_namespace' => $remotePageNs,
 						'page_title' => $remotePageTitle,
-					),
-					array( 'page_id' => $pageID ),
+					],
+					[ 'page_id' => $pageID ],
 					__METHOD__
 				);
 				# Update revisions on the moved page
-				$pageInfo = array(
+				$pageInfo = [
 					'pageid' => $pageID,
 					'title' => $remotePageTitle,
 					'ns' => $remotePageNs,
 					'protection' => true,
-				);
+				];
 				# Need to process also old revisions in case there were page restores
 				$this->processPage( $pageInfo, null, false );
 				if ( ! in_array( $pageID, $this->pagesProcessed ) ) {
@@ -1246,22 +1246,22 @@ class GrabNewText extends Maintenance {
 			}
 			# Now process the original title. If it exists on remote wiki, the
 			# corresponding page will be created, otherwise nothing will be done
-			$pageInfo = array(
+			$pageInfo = [
 				'pageid' => null,
 				'title' => $title,
 				'ns' => $ns,
 				'protection' => true,
-			);
+			];
 			# Need to process also old revisions in case there were page restores
 			$this->processPage( $pageInfo, null, false );
 		} else {
 			# Local title doesn't exist. Should have been created after,
 			# the move but we haven't processed it yet in recentchanges.
 			# Or it's under another title. See if title exists on remote wiki
-			$params = array(
+			$params = [
 				'prop' => 'info',
 				'titles' => (string)$sourceTitle
-			);
+			];
 			$result = $this->bot->query( $params );
 
 			if ( ! $result || isset( $result['error'] ) ) {
@@ -1283,11 +1283,11 @@ class GrabNewText extends Maintenance {
 			# already know that the original local title doesn't exist
 			$row = $this->dbw->selectRow(
 				'page',
-				array(
+				[
 					'page_namespace',
 					'page_title'
-				),
-				array( 'page_id' => $remoteID ),
+				],
+				[ 'page_id' => $remoteID ],
 				__METHOD__
 			);
 			if ( $row ) {
@@ -1296,22 +1296,22 @@ class GrabNewText extends Maintenance {
 					Title::makeTitle( $row->page_namespace, $row->page_title ) ) );
 				$this->dbw->update(
 					'page',
-					array(
+					[
 						'page_namespace' => $ns,
 						'page_title' => $title,
-					),
-					array( 'page_id' => $remoteID ),
+					],
+					[ 'page_id' => $remoteID ],
 					__METHOD__
 				);
 			}
 			# Do processPage. If we had the page and we've moved it, it'll add the
 			# revisions of the move, otherwise it will create the page if needed
-			$pageInfo = array(
+			$pageInfo = [
 				'pageid' => $remoteID,
 				'title' => $title,
 				'ns' => $ns,
 				'protection' => true,
-			);
+			];
 			# Need to process also old revisions in case there were page restores
 			$this->processPage( $pageInfo, null, false );
 			if ( ! in_array( $remoteID, $this->pagesProcessed ) ) {
@@ -1346,10 +1346,10 @@ class GrabNewText extends Maintenance {
 		}
 
 		# Get current title of the existing local page ID and move it to where it belongs
-		$params = array(
+		$params = [
 			'prop' => 'info',
 			'pageids' => $conflictingPageID
-		);
+		];
 		$result = $this->bot->query( $params );
 		$info_pages = array_values( $result['query']['pages'] );
 
@@ -1380,12 +1380,12 @@ class GrabNewText extends Maintenance {
 					$pageObj = (array)$this->dbw->selectRow(
 						'page',
 						'*',
-						array( 'page_id' => $resultingPageID ),
+						[ 'page_id' => $resultingPageID ],
 						__METHOD__
 					);
 					$this->dbw->delete(
 						'page',
-						array( 'page_id' => $resultingPageID ),
+						[ 'page_id' => $resultingPageID ],
 						__METHOD__
 					);
 				} else {
@@ -1413,11 +1413,11 @@ class GrabNewText extends Maintenance {
 			$this->output( "Moving page ID $conflictingPageID to $resultingPageTitle...\n" );
 			$this->dbw->update(
 				'page',
-				array(
+				[
 					'page_namespace' => $resultingNs,
 					'page_title' => $resultingTitle,
-				),
-				array( 'page_id' => $conflictingPageID ),
+				],
+				[ 'page_id' => $conflictingPageID ],
 				__METHOD__
 			);
 		}
@@ -1434,10 +1434,10 @@ class GrabNewText extends Maintenance {
 		$pageID = (int)$this->dbw->selectField(
 			'page',
 			'page_id',
-			array(
+			[
 				'page_namespace' => $ns,
 				'page_title' => $title,
-			),
+			],
 			__METHOD__
 		);
 		return $pageID;

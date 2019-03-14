@@ -34,7 +34,7 @@ class GrabNewFiles extends FileGrabber {
 	 *
 	 * @var array
 	 */
-	protected $pendingUploads = array();
+	protected $pendingUploads = [];
 
 	/**
 	 * A list of page titles of images that need checking for deletions and restores.
@@ -42,7 +42,7 @@ class GrabNewFiles extends FileGrabber {
 	 *
 	 * @var array
 	 */
-	protected $pendingDeletions = array();
+	protected $pendingDeletions = [];
 
 	public function __construct() {
 		parent::__construct();
@@ -74,13 +74,13 @@ class GrabNewFiles extends FileGrabber {
 			$this->endDate = wfTimestampNow();
 		}
 
-		$params = array(
+		$params = [
 			'list' => 'logevents',
 			'leprop' => 'ids|title|type|timestamp|details|comment|userid',
 			'leend' => (string)$this->endDate,
 			'ledir' => 'newer',
 			'lelimit' => 'max'
-		);
+		];
 
 		if ( $this->isWikia ) {
 			# letype doesn't accept multiple values. Multiple values work only
@@ -164,7 +164,7 @@ class GrabNewFiles extends FileGrabber {
 		$img_timestamp = $this->dbw->selectField(
 			'image',
 			'img_timestamp',
-			array( 'img_name' => $name ),
+			[ 'img_name' => $name ],
 			__METHOD__
 		);
 
@@ -184,7 +184,7 @@ class GrabNewFiles extends FileGrabber {
 			$moveOldImage = true;
 		}
 
-		$params = array(
+		$params = [
 			'titles' => $title,
 			'prop' => 'imageinfo',
 			'iiprop' => 'timestamp|user|userid|comment|url|size|sha1|mime|metadata|archivename|bitdepth|mediatype',
@@ -193,7 +193,7 @@ class GrabNewFiles extends FileGrabber {
 			'iiend' => $endtimestamp,
 			# We don't care about continuation, it shouldn't be more than 2 files here
 			'iilimit' => 'max'
-		);
+		];
 		$result = $this->bot->query( $params );
 
 		# Api always returns an entry for title
@@ -245,7 +245,7 @@ class GrabNewFiles extends FileGrabber {
 			$moveOldImage = false;
 			$this->dbw->delete(
 				'image',
-				array( 'img_name' => $name ),
+				[ 'img_name' => $name ],
 				__METHOD__
 			);
 		}
@@ -265,7 +265,7 @@ class GrabNewFiles extends FileGrabber {
 		$this->output( "Moving current file $name to archive $oldArchiveName\n" );
 		$this->dbw->begin();
 		$this->dbw->insertSelect( 'oldimage', 'image',
-			array(
+			[
 				'oi_name' => 'img_name',
 				'oi_archive_name' => $this->dbw->addQuotes( $oldArchiveName ),
 				'oi_size' => 'img_size',
@@ -281,13 +281,13 @@ class GrabNewFiles extends FileGrabber {
 				'oi_major_mime' => 'img_major_mime',
 				'oi_minor_mime' => 'img_minor_mime',
 				'oi_sha1' => 'img_sha1'
-			),
-			array( 'img_name' => $name ),
+			],
+			[ 'img_name' => $name ],
 			__METHOD__
 		);
 		$this->dbw->delete(
 			'image',
-			array( 'img_name' => $name ),
+			[ 'img_name' => $name ],
 			__METHOD__
 		);
 		$file = $this->localRepo->newFile( $name );
@@ -384,17 +384,17 @@ class GrabNewFiles extends FileGrabber {
 		# We add it to the array even if it exists already
 		if ( $logEntry['action'] == 'delete' ) {
 			# Update deletion reason and user, in case we had a restore action
-			$this->pendingDeletions[$title] = array(
+			$this->pendingDeletions[$title] = [
 				'reason' => $logEntry['comment'],
 				'user' => User::newFromId( (int)$logEntry['userid'] )
-			);
+			];
 		} elseif ( !array_key_exists( $title, $this->pendingDeletions ) ) {
 			# Check to avoid overwritting the deletion reason or user on restore,
 			# which we don't need on file restore
-			$this->pendingDeletions[$title] = array(
+			$this->pendingDeletions[$title] = [
 				'reason' => '',
 				'user' => null
-			);
+			];
 		}
 	}
 
@@ -414,7 +414,7 @@ class GrabNewFiles extends FileGrabber {
 		$imageObj = $this->dbw->selectRow(
 			'image',
 			'*',
-			array( 'img_name' => $name ),
+			[ 'img_name' => $name ],
 			__METHOD__
 		);
 
@@ -431,13 +431,13 @@ class GrabNewFiles extends FileGrabber {
 		}
 
 		$overwrittenArchiveName = null;
-		$params = array(
+		$params = [
 			'titles' => $title,
 			'prop' => 'imageinfo',
 			'iiprop' => 'timestamp|user|userid|comment|url|size|sha1|mime|metadata|archivename|bitdepth|mediatype',
 			'iiend' => $endtimestamp,
 			'iilimit' => 'max'
-		);
+		];
 		$iistart = $timestamp;
 		$more = true;
 		$count = 0;
@@ -477,7 +477,7 @@ class GrabNewFiles extends FileGrabber {
 					# Move the archived file to where it belongs
 					if ( $count > 0 && !is_null( $overwrittenArchiveName ) ) {
 						$this->output( sprintf( 'Moving overwritten archive %s to timestamp %s... ',
-							 $overwrittenArchiveName, $imageObj->img_timestamp ) );
+							$overwrittenArchiveName, $imageObj->img_timestamp ) );
 						$zombieFile = $this->localRepo->newFromArchiveName( $name, $overwrittenArchiveName );
 						$archivedFile = $this->localRepo->newFile( $name, $imageObj->img_timestamp );
 						$archivedFile->publish( $zombieFile->getPath(), File::DELETE_SOURCE );
@@ -496,7 +496,7 @@ class GrabNewFiles extends FileGrabber {
 						# Delete existing row from image before importing
 						$this->dbw->delete(
 							'image',
-							array( 'img_name' => $name ),
+							[ 'img_name' => $name ],
 							__METHOD__
 						);
 					}
@@ -543,14 +543,14 @@ class GrabNewFiles extends FileGrabber {
 		$imageObj = $this->dbw->selectRow(
 			'image',
 			'*',
-			array( 'img_name' => $name ),
+			[ 'img_name' => $name ],
 			__METHOD__
 		);
 
 		$moveOldImage = false;
 		$fileHistoryResult = null;
 		$currentHistoryEntry = false;
-		$idsToRestore = array(); # filearchive IDs
+		$idsToRestore = []; # filearchive IDs
 		if ( $imageObj ) {
 			$ourtimestamp = wfTimestamp( TS_ISO_8601, $imageObj->img_timestamp );
 			$moveOldImage = true;
@@ -558,21 +558,21 @@ class GrabNewFiles extends FileGrabber {
 			# Get file history
 			$fileHistoryResult = $this->dbw->select(
 				'oldimage',
-				array( 'oi_timestamp' ),
-				array( 'oi_name' => $name ),
+				[ 'oi_timestamp' ],
+				[ 'oi_name' => $name ],
 				__METHOD__,
-				array( 'ORDER BY' => 'oi_timestamp DESC' )
+				[ 'ORDER BY' => 'oi_timestamp DESC' ]
 			);
 			$currentHistoryEntry = $fileHistoryResult ? $fileHistoryResult->fetchRow() : false;
 		}
 
 		$overwrittenArchiveName = null;
-		$params = array(
+		$params = [
 			'titles' => $title,
 			'prop' => 'imageinfo',
 			'iiprop' => 'timestamp|user|userid|comment|url|size|sha1|mime|metadata|archivename|bitdepth|mediatype',
 			'iilimit' => 'max'
-		);
+		];
 		$iistart = null;
 		$more = true;
 		$count = 0;
@@ -612,7 +612,7 @@ class GrabNewFiles extends FileGrabber {
 					# Move the archived file to where it belongs if it's not the top version
 					if ( $count > 0 && !is_null( $overwrittenArchiveName ) ) {
 						$this->output( sprintf( 'Moving overwritten archive %s to timestamp %s... ',
-							 $overwrittenArchiveName, $imageObj->img_timestamp ) );
+							$overwrittenArchiveName, $imageObj->img_timestamp ) );
 						$zombieFile = $this->localRepo->newFromArchiveName( $name, $overwrittenArchiveName );
 						$archivedFile = $this->localRepo->newFile( $name, $imageObj->img_timestamp );
 						$archivedFile->publish( $zombieFile->getPath(), File::DELETE_SOURCE );
@@ -657,7 +657,7 @@ class GrabNewFiles extends FileGrabber {
 					$id = $this->dbw->selectField(
 						'filearchive',
 						'fa_id',
-						array( 'fa_name' => $name, 'fa_timestamp' => $timestamp ),
+						[ 'fa_name' => $name, 'fa_timestamp' => $timestamp ],
 						__METHOD__
 					);
 					if ( $id ) {
@@ -680,7 +680,7 @@ class GrabNewFiles extends FileGrabber {
 						# Delete existing row from image before importing
 						$this->dbw->delete(
 							'image',
-							array( 'img_name' => $name ),
+							[ 'img_name' => $name ],
 							__METHOD__
 						);
 					}
@@ -688,7 +688,7 @@ class GrabNewFiles extends FileGrabber {
 					$id = $this->dbw->selectField(
 						'filearchive',
 						'fa_id',
-						array( 'fa_name' => $name, 'fa_timestamp' => $timestamp ),
+						[ 'fa_name' => $name, 'fa_timestamp' => $timestamp ],
 						__METHOD__
 					);
 					if ( $id ) {

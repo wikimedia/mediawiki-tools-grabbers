@@ -81,7 +81,7 @@ abstract class FileGrabber extends Maintenance {
 		}
 
 		# Get a single DB_MASTER connection
-		$this->dbw = wfGetDB( DB_MASTER, array(), $this->getOption( 'db', $wgDBname ) );
+		$this->dbw = wfGetDB( DB_MASTER, [], $this->getOption( 'db', $wgDBname ) );
 
 		# Get a local repo instance
 		$this->localRepo = RepoGroup::singleton()->getLocalRepo();
@@ -146,7 +146,7 @@ abstract class FileGrabber extends Maintenance {
 			$comment = '';
 		}
 
-		$file_e = array(
+		$file_e = [
 			'name' => $name,
 			'size' => $fileVersion['size'],
 			'width' => $fileVersion['width'],
@@ -160,7 +160,7 @@ abstract class FileGrabber extends Maintenance {
 			'deleted' => 0,
 			'sha1' => Wikimedia\base_convert( $fileVersion['sha1'], 16, 36, 31 ),
 			'metadata' => serialize( $this->processMetaData( $fileVersion['metadata'] ) ),
-		);
+		];
 
 		$mime = $fileVersion['mime'];
 		$mimeBreak = strpos( $mime, '/' );
@@ -168,7 +168,7 @@ abstract class FileGrabber extends Maintenance {
 		$file_e['minor_mime'] = substr( $mime, $mimeBreak + 1 );
 
 		# Current version
-		$e = array(
+		$e = [
 			'img_name' => $name,
 			'img_size' => $file_e['size'],
 			'img_width' => $file_e['width'],
@@ -183,7 +183,7 @@ abstract class FileGrabber extends Maintenance {
 			'img_metadata' => $file_e['metadata'],
 			'img_major_mime' => $file_e['major_mime'],
 			'img_minor_mime' => $file_e['minor_mime']
-		);
+		];
 		$this->dbw->insert( 'image', $e, __METHOD__ );
 		$status = $this->storeFileFromURL( $name, $fileurl, false );
 		$this->output( "Done\n" );
@@ -243,7 +243,7 @@ abstract class FileGrabber extends Maintenance {
 
 		$fileurl = $this->sanitiseUrl( $fileVersion['url'] );
 
-		$file_e = array(
+		$file_e = [
 			'name' => $name,
 			'size' => $fileVersion['size'],
 			'width' => $fileVersion['width'],
@@ -257,7 +257,7 @@ abstract class FileGrabber extends Maintenance {
 			'deleted' => $filedeleted,
 			'sha1' => Wikimedia\base_convert( $fileVersion['sha1'], 16, 36, 31 ),
 			'metadata' => serialize( $this->processMetaData( $fileVersion['metadata'] ) ),
-		);
+		];
 
 		$mime = $fileVersion['mime'];
 		$mimeBreak = strpos( $mime, '/' );
@@ -265,7 +265,7 @@ abstract class FileGrabber extends Maintenance {
 		$file_e['minor_mime'] = substr( $mime, $mimeBreak + 1 );
 
 		# Old version
-		$e = array(
+		$e = [
 			'oi_name' => $name,
 			'oi_archive_name' => $fileVersion['archivename'],
 			'oi_size' => $file_e['size'],
@@ -282,7 +282,7 @@ abstract class FileGrabber extends Maintenance {
 			'oi_metadata' => $file_e['metadata'],
 			'oi_major_mime' => $file_e['major_mime'],
 			'oi_minor_mime' => $file_e['minor_mime']
-		);
+		];
 		$this->dbw->insert( 'oldimage', $e, __METHOD__ );
 		$status = $this->storeFileFromURL( $name, $fileurl, $file_e['timestamp'] );
 		$this->output( "Done\n" );
@@ -343,7 +343,7 @@ abstract class FileGrabber extends Maintenance {
 	 */
 	function downloadFile( $fileurl, $targetTempFile, $sha1 = null ) {
 		$this->mTmpHandle = fopen( $targetTempFile, 'wb' );
-		$req = MWHttpRequest::factory( $fileurl, array( 'timeout' => 90 ), __METHOD__ );
+		$req = MWHttpRequest::factory( $fileurl, [ 'timeout' => 90 ], __METHOD__ );
 		$req->setCallback( [ $this, 'saveTempFileChunk' ] );
 		$status = $req->execute();
 		fclose( $this->mTmpHandle );
@@ -397,7 +397,7 @@ abstract class FileGrabber extends Maintenance {
 	 * @returns array
 	 */
 	function processMetaData( $metadata ) {
-		$result = array();
+		$result = [];
 		if ( !is_array( $metadata ) ) {
 			return $result;
 		}
@@ -428,8 +428,7 @@ abstract class FileGrabber extends Maintenance {
 		if ( $this->isWikia &&
 			$fileVersion['mime'] == 'video/youtube' &&
 			strtoupper( $fileVersion['mediatype'] ) == 'VIDEO'
-		)
-		{
+		) {
 			return true;
 		}
 		return false;
@@ -469,5 +468,4 @@ abstract class FileGrabber extends Maintenance {
 		$title = str_replace( ' ', '_', $title );
 		return $title;
 	}
-
 }

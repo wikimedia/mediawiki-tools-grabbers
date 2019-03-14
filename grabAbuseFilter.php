@@ -69,7 +69,7 @@ class GrabAbuseFilter extends Maintenance {
 		}
 
 		# Get a single DB_MASTER connection
-		$this->dbw = wfGetDB( DB_MASTER, array(), $this->getOption( 'db', $wgDBname ) );
+		$this->dbw = wfGetDB( DB_MASTER, [], $this->getOption( 'db', $wgDBname ) );
 
 		$user = $this->getOption( 'username' );
 		$password = $this->getOption( 'password' );
@@ -100,12 +100,12 @@ class GrabAbuseFilter extends Maintenance {
 			);
 		}
 
-		$params = array(
+		$params = [
 			'list' => 'abusefilters',
 			'abflimit' => 'max',
 			'ledir' => 'newer',
 			'leprop' => 'id|description|pattern|actions|hits|comments|lasteditor|lastedittime|status|private',
-		);
+		];
 
 		$more = true;
 		$i = 0;
@@ -147,7 +147,7 @@ class GrabAbuseFilter extends Maintenance {
 	}
 
 	public function processEntry( $entry ) {
-		$e = array(
+		$e = [
 			'af_id' => $entry['id'],
 			'af_pattern' => $entry['pattern'],
 			'af_user' => 0, # Not available
@@ -163,7 +163,7 @@ class GrabAbuseFilter extends Maintenance {
 			'af_actions' => $entry['actions'],
 			'af_global' => false,
 			'af_group' => 'default'
-		);
+		];
 
 		$this->dbw->insert( 'abuse_filter', $e, __METHOD__ );
 		$this->dbw->commit();

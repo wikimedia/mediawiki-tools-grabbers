@@ -53,20 +53,20 @@ class GrabNamespaceInfo extends Maintenance {
 	function parseNamespaces() {
 		global $bot;
 
-		$params = array(
+		$params = [
 			'meta' => 'siteinfo',
 			'siprop' => 'namespaces|namespacealiases'
-		);
+		];
 		$result = $bot->query( $params );
 		if ( !$result['query'] ) {
 			$this->error( 'Got no namespaces...', true );
 		}
 		$namespaces = $result['query']['namespaces'];
-		$customNamespaces = array();
+		$customNamespaces = [];
 
-		$contentNamespaces = array();
-		$subpageNamespaces = array();
-		$namespaceAliases = array();	# $wgNamespaceAliases['WP'] = NS_PROJECT;
+		$contentNamespaces = [];
+		$subpageNamespaces = [];
+		$namespaceAliases = [];	# $wgNamespaceAliases['WP'] = NS_PROJECT;
 		foreach ( array_keys( $namespaces ) as $ns ) {
 			# Content?
 			if ( isset( $namespaces[$ns]['content'] ) ) {
@@ -91,7 +91,7 @@ class GrabNamespaceInfo extends Maintenance {
 		}
 
 		# Show stuff
-		$this->output( "# Extra namespaces or some such\n" );
+		$this->output( "# Extra namespaces\n" );
 		foreach ( array_keys( $customNamespaces ) as $ns ) {
 			$namespaceName = str_replace( ' ', '_', $customNamespaces[$ns] );
 			$this->output( '$wgExtraNamespaces[' . $ns . '] = "' . $namespaceName . '";' . "\n" );
@@ -102,7 +102,7 @@ class GrabNamespaceInfo extends Maintenance {
 			$this->output( "\n# Content namespaces\n" );
 			$this->output( '$wgContentNamespaces = array_merge(' . "\n" );
 			$this->output( "\t" . '$wgContentNamespaces,' . "\n" );
-			$this->output( "\t" . 'array( ' );
+			$this->output( "\t" . '[ ' );
 			$this->output( $contentNamespaces[1] );
 
 			foreach ( array_keys( $contentNamespaces ) as $i ) {
@@ -110,7 +110,7 @@ class GrabNamespaceInfo extends Maintenance {
 					$this->output( ", {$contentNamespaces[$i]}" );
 				}
 			}
-			$this->output( " )\n" );
+			$this->output( " ]\n" );
 			$this->output( ");\n" );
 		}
 

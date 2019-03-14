@@ -76,7 +76,7 @@ class GrabLogs extends Maintenance {
 		}
 
 		# Get a single DB_MASTER connection
-		$this->dbw = wfGetDB( DB_MASTER, array(), $this->getOption( 'db', $wgDBname ) );
+		$this->dbw = wfGetDB( DB_MASTER, [], $this->getOption( 'db', $wgDBname ) );
 
 		$apiLimits = $this->getOption( 'apilimits' );
 		if ( !is_null( $apiLimits ) && is_numeric( $apiLimits ) && (int)$apiLimits > 0 ) {
@@ -119,12 +119,12 @@ class GrabLogs extends Maintenance {
 			);
 		}
 
-		$params = array(
+		$params = [
 			'list' => 'logevents',
 			'lelimit' => $this->getApiLimit(),
 			'ledir' => 'newer',
 			'leprop' => 'ids|title|type|user|userid|timestamp|comment|details|tags',
-		);
+		];
 
 		$lestart = $this->getOption( 'start' );
 		if ( $lestart ) {
@@ -154,7 +154,7 @@ class GrabLogs extends Maintenance {
 		# may fail because entries with the same timestamp are not guaranteed
 		# to be returned in the same order. This has been solved in recent
 		# MediaWiki versions where continuation parameters also contains log ID
-		$processedInPrevBatch = array();
+		$processedInPrevBatch = [];
 
 		$this->output( "Fetching log events...\n" );
 		do {
@@ -173,7 +173,7 @@ class GrabLogs extends Maintenance {
 				break;
 			}
 
-			$currentIDs = array();
+			$currentIDs = [];
 
 			foreach ( $result['query']['logevents'] as $logEntry ) {
 				if ( !in_array( $logEntry['logid'], $processedInPrevBatch ) &&
@@ -245,7 +245,7 @@ class GrabLogs extends Maintenance {
 			}
 		}
 
-		$e = array(
+		$e = [
 			'log_id' => $entry['logid'],
 			'log_type' => $entry['type'],
 			'log_action' => $entry['action'],
@@ -257,7 +257,7 @@ class GrabLogs extends Maintenance {
 			'log_comment' => $wgContLang->truncate( $entry['comment'], 255 ),
 			'log_params' => $this->encodeLogParams( $entry ),
 			'log_deleted' => $revdeleted
-		);
+		];
 		# May not be set in older MediaWiki instances. This field can be null
 		# Note that it contains the page id at the time the log was inserted,
 		# not the current page id of the title.
@@ -274,19 +274,19 @@ class GrabLogs extends Maintenance {
 			foreach ( $entry['tags'] as $tag ) {
 				$this->dbw->insert(
 					'change_tag',
-					array(
+					[
 						'ct_log_id' => $e['log_id'],
 						'ct_tag' => $tag,
-					),
+					],
 					__METHOD__
 				);
 			}
 			$this->dbw->insert(
 				'tag_summary',
-				array(
+				[
 					'ts_log_id' => $e['log_id'],
 					'ts_tags' => implode( ',', $entry['tags'] ),
-				),
+				],
 				__METHOD__
 			);
 		}
@@ -322,7 +322,7 @@ class GrabLogs extends Maintenance {
 			# them again to store them in database.
 			# This sucks horribly.
 			# Checked against MediaWiki 1.29
-			$unserializedParams = array();
+			$unserializedParams = [];
 			switch ( $entry['type'] ) {
 				case 'move':
 					# Since MediaWiki 1.25 target title comes as target_title/target_ns.
@@ -371,16 +371,16 @@ class GrabLogs extends Maintenance {
 						# Transform metadata: Discard group, transform expriry timestamp
 						$unserializedParams['oldmetadata'] = $this->mapToTransformations(
 							$explicitParams['oldmetadata'],
-							array(),
-							array( 'expiry' )
+							[],
+							[ 'expiry' ]
 						);
 					}
 					if ( isset( $explicitParams['newmetadata'] ) ) {
 						# Transform metadata: Discard group, transform expriry timestamp
 						$unserializedParams['newmetadata'] = $this->mapToTransformations(
 							$explicitParams['newmetadata'],
-							array(),
-							array( 'expiry' )
+							[],
+							[ 'expiry' ]
 						);
 					}
 					break;
@@ -404,9 +404,9 @@ class GrabLogs extends Maintenance {
 					$unserializedParams['5:bool:cascade'] = isset( $explicitParams['cascade'] );
 					$unserializedParams['details'] = $this->mapToTransformations(
 							$explicitParams['details'],
-							array( 'type', 'level' ),
-							array( 'expiry' ),
-							array( 'cascade' )
+							[ 'type', 'level' ],
+							[ 'expiry' ],
+							[ 'cascade' ]
 						);
 					break;
 				case 'delete':
@@ -429,8 +429,8 @@ class GrabLogs extends Maintenance {
 				case 'upload':
 					$unserializedParams = $this->mapToTransformations(
 							$explicitParams,
-							array( 'img_sha1' ),
-							array( 'img_timestamp' )
+							[ 'img_sha1' ],
+							[ 'img_timestamp' ]
 						);
 					break;
 				case 'merge':
@@ -451,7 +451,7 @@ class GrabLogs extends Maintenance {
 					)
 					{
 						$index = 0;
-						$lines = array();
+						$lines = [];
 						while ( isset( $entry[(string)$index] ) ) {
 							$lines[] = $entry[(string)$index];
 							$index++;
@@ -467,7 +467,7 @@ class GrabLogs extends Maintenance {
 			$encodedParams = serialize( $unserializedParams );
 		} else {
 			$index = 0;
-			$lines = array();
+			$lines = [];
 			while ( isset( $entry[(string)$index] ) ) {
 				$lines[] = $entry[(string)$index];
 				$index++;
@@ -506,7 +506,7 @@ class GrabLogs extends Maintenance {
 	 */
 	private function mapToTransformations( $origin, $passThroughKeys, $timestampKeys = [], $booleanKeys = [] ) {
 		$transformed = array_map( function( $item ) use ( $passThroughKeys, $timestampKeys ) {
-			$result = array();
+			$result = [];
 			foreach ( $passThroughKeys as $key ) {
 				if ( isset( $item[$key] ) ) {
 					$result[$key] = $item[$key];

@@ -140,14 +140,14 @@ class GrabDeletedText extends Maintenance {
 		}
 
 		# Get a single DB_MASTER connection
-		$this->dbw = wfGetDB( DB_MASTER, array(), $this->getOption( 'db', $wgDBname ) );
+		$this->dbw = wfGetDB( DB_MASTER, [], $this->getOption( 'db', $wgDBname ) );
 		# Get last text id
 		$this->lastTextId = (int)$this->dbw->selectField(
 			'text',
 			'old_id',
-			array(),
+			[],
 			__METHOD__,
-			array( 'ORDER BY' => 'old_id DESC' )
+			[ 'ORDER BY' => 'old_id DESC' ]
 		);
 
 		# bot class and log in
@@ -163,12 +163,12 @@ class GrabDeletedText extends Maintenance {
 			# Commented out, this doesn't work on Wikia. Simply let the api
 			# error out on first deletedrevs access
 			## Does the user have deletion rights?
-			#$params = array(
+			#$params = [
 			#	'list' => 'allusers',
 			#	'aulimit' => '1',
 			#	'auprop' => 'rights',
 			#	'aufrom' => $user
-			#);
+			#];
 			#$result = $this->bot->query( $params );
 			#if ( !in_array( 'deletedtext', $result['query']['allusers'][0]['rights'] ) ) {
 			#	$this->error( "$user does not have required rights to fetch deleted revisions.", 1 );
@@ -181,10 +181,10 @@ class GrabDeletedText extends Maintenance {
 
 		$this->output( "Retreiving namespaces list...\n" );
 
-		$params = array(
+		$params = [
 			'meta' => 'siteinfo',
 			'siprop' => 'namespaces|statistics|namespacealiases'
-		);
+		];
 		$result = $this->bot->query( $params );
 		$siteinfo = $result['query'];
 
@@ -193,7 +193,7 @@ class GrabDeletedText extends Maintenance {
 			$this->error( 'No siteinfo data found...', 1 );
 		}
 
-		$textNamespaces = array();
+		$textNamespaces = [];
 		if ( $this->hasOption( 'namespaces' ) ) {
 			$textNamespaces = explode( '|', $this->getOption( 'namespaces', '' ) );
 		} else {
@@ -239,13 +239,13 @@ class GrabDeletedText extends Maintenance {
 
 			# TODO: list=deletedrevs is deprecated in recent MediaWiki versions.
 			# should try to use list=alldeletedrevisions first and fallback to deletedrevs
-			$params = array(
+			$params = [
 				'list' => 'deletedrevs',
 				'drnamespace' => $ns,
 				'drlimit' => $this->getApiLimit(),
 				'drdir' => 'newer',
 				'drprop' => 'revid|user|userid|comment|minor|len|content|parentid',
-			);
+			];
 
 			while ( $more ) {
 				if ( $drcontinue === null ) {
@@ -343,11 +343,11 @@ class GrabDeletedText extends Maintenance {
 				$result = $this->dbw->selectField(
 					'archive',
 					'ar_title',
-					array(
+					[
 						'ar_title' => $title,
 						'ar_timestamp' => $timestamp,
 						'ar_rev_id' => $revision['revid']
-					),
+					],
 					__METHOD__
 				);
 				if ( $result ) {
@@ -397,7 +397,7 @@ class GrabDeletedText extends Maintenance {
 				$revdeleted = $revdeleted | Revision::DELETED_RESTRICTED;
 			}
 
-			$e = array(
+			$e = [
 				'namespace' => $ns,
 				'title' => $title,
 				'text' => '',
@@ -412,7 +412,7 @@ class GrabDeletedText extends Maintenance {
 				'len' => strlen( $text ),
 				'sha1' => Revision::base36Sha1( $text ),
 				'parent_id' => $parentID
-			);
+			];
 
 			$e['text_id'] = $this->storeText( $text, $e['sha1'] );
 
@@ -420,7 +420,7 @@ class GrabDeletedText extends Maintenance {
 
 			$this->dbw->insert(
 				'archive',
-				array(
+				[
 					'ar_namespace' => $e['namespace'],
 					'ar_title' => $e['title'],
 					'ar_text' => $e['text'],
@@ -437,7 +437,7 @@ class GrabDeletedText extends Maintenance {
 					'ar_sha1' => $e['sha1'],
 					#'ar_page_id' => NULL, # Not requred and unreliable from api
 					'ar_parent_id' => $e['parent_id']
-				),
+				],
 				__METHOD__
 			);
 			$this->dbw->commit();
@@ -477,19 +477,19 @@ class GrabDeletedText extends Maintenance {
 			$flags .= 'external';
 		}
 
-		$e = array(
+		$e = [
 			'id' => $this->lastTextId,
 			'text' => $text,
 			'flags' => $flags
-		);
+		];
 
 		$this->dbw->insert(
 			'text',
-			array(
+			[
 				'old_id' => $e['id'],
 				'old_text' => $e['text'],
 				'old_flags' => $e['flags']
-			),
+			],
 			__METHOD__
 		);
 

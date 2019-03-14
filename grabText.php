@@ -91,7 +91,7 @@ class GrabText extends Maintenance {
 		}
 
 		# Get a single DB_MASTER connection
-		$this->dbw = wfGetDB( DB_MASTER, array(), $this->getOption( 'db', $wgDBname ) );
+		$this->dbw = wfGetDB( DB_MASTER, [], $this->getOption( 'db', $wgDBname ) );
 
 		# Check if wiki supports page counters (removed from core in 1.25)
 		$this->supportsCounters = $this->dbw->fieldExists( 'page', 'page_counter', __METHOD__ );
@@ -100,9 +100,9 @@ class GrabText extends Maintenance {
 		$this->lastTextId = (int)$this->dbw->selectField(
 			'text',
 			'old_id',
-			array(),
+			[],
 			__METHOD__,
-			array( 'ORDER BY' => 'old_id DESC' )
+			[ 'ORDER BY' => 'old_id DESC' ]
 		);
 
 		# bot class and log in if requested
@@ -134,10 +134,10 @@ class GrabText extends Maintenance {
 		# Get all pages as a list, start by getting namespace numbers...
 		$this->output( "Retrieving namespaces list...\n" );
 
-		$params = array(
+		$params = [
 			'meta' => 'siteinfo',
 			'siprop' => 'namespaces|statistics|namespacealiases'
-		);
+		];
 		$result = $this->bot->query( $params );
 		$siteinfo = $result['query'];
 
@@ -146,7 +146,7 @@ class GrabText extends Maintenance {
 			$this->error( 'No siteinfo data found', 1 );
 		}
 
-		$textNamespaces = array();
+		$textNamespaces = [];
 		if ( $this->hasOption( 'namespaces' ) ) {
 			$textNamespaces = explode( '|', $this->getOption( 'namespaces', '' ) );
 			$grabFromAllNamespaces = false;
@@ -210,13 +210,13 @@ class GrabText extends Maintenance {
 		$doneCount = 0;
 		$nsPageCount = 0;
 		$more = true;
-		$params = array(
+		$params = [
 			'generator' => 'allpages',
 			'gaplimit' => 'max',
 			'prop' => 'info',
 			'inprop' => 'protection',
 			'gapnamespace' => $ns
-		);
+		];
 		if ( $continueTitle ) {
 			$params['gapfrom'] = $continueTitle;
 		}
@@ -267,13 +267,13 @@ class GrabText extends Maintenance {
 
 		$this->output( "Processing page id $pageID...\n" );
 
-		$params = array(
+		$params = [
 			'prop' => 'info|revisions',
 			'rvlimit' => 'max',
 			'rvprop' => 'ids|flags|timestamp|user|userid|comment|content|tags',
 			'rvdir' => 'newer',
 			'rvend' => wfTimestamp( TS_ISO_8601, $this->endDate )
-		);
+		];
 		$params['pageids'] = $pageID;
 		if ( $page['protection'] ) {
 			$params['inprop'] = 'protection';
@@ -303,7 +303,7 @@ class GrabText extends Maintenance {
 			$pageID = $info_pages[0]['pageid'];
 		}
 
-		$page_e = array(
+		$page_e = [
 			'namespace' => null,
 			'title' => null,
 			'restrictions' => '',
@@ -314,7 +314,7 @@ class GrabText extends Maintenance {
 			'touched' => wfTimestampNow(),
 			'len' => 0,
 			'content_model' => null
-		);
+		];
 		# Trim and convert displayed title to database page title
 		# Get it from the returned value from api
 		$page_e['namespace'] = $info_pages[0]['ns'];
@@ -343,7 +343,7 @@ class GrabText extends Maintenance {
 		$rowCount = $this->dbw->selectRowCount(
 			'page',
 			'page_id',
-			array( 'page_id' => $pageID ),
+			[ 'page_id' => $pageID ],
 			__METHOD__
 		);
 		if ( $rowCount ) {
@@ -367,31 +367,31 @@ class GrabText extends Maintenance {
 			# Delete first any existing protection
 			$this->dbw->delete(
 				'page_restrictions',
-				array( 'pr_page' => $pageID ),
+				[ 'pr_page' => $pageID ],
 				__METHOD__
 			);
 			# insert current restrictions
 			foreach ( $info_pages[0]['protection'] as $prot ) {
 				# Skip protections inherited from cascade protections
 				if ( !isset( $prot['source'] ) ) {
-					$e = array(
+					$e = [
 						'page' => $pageID,
 						'type' => $prot['type'],
 						'level' => $prot['level'],
 						'cascade' => (int)isset( $prot['cascade'] ),
 						'user' => null,
 						'expiry' => ( $prot['expiry'] == 'infinity' ? 'infinity' : wfTimestamp( TS_MW, $prot['expiry'] ) )
-					);
+					];
 					$this->dbw->insert(
 						'page_restrictions',
-						array(
+						[
 							'pr_page' => $e['page'],
 							'pr_type' => $e['type'],
 							'pr_level' => $e['level'],
 							'pr_cascade' => $e['cascade'],
 							'pr_user' => $e['user'],
 							'pr_expiry' => $e['expiry']
-						),
+						],
 						__METHOD__
 					);
 				}
@@ -425,7 +425,7 @@ class GrabText extends Maintenance {
 			return;
 		}
 
-		$insert_fields = array(
+		$insert_fields = [
 			'page_namespace' => $page_e['namespace'],
 			'page_title' => $page_e['title'],
 			'page_restrictions' => $page_e['restrictions'],
@@ -436,7 +436,7 @@ class GrabText extends Maintenance {
 			'page_latest' => $page_e['latest'],
 			'page_len' => $page_e['len'],
 			'page_content_model' => $page_e['content_model']
-		);
+		];
 		if ( $this->supportsCounters && $page_e['counter'] ) {
 			$insert_fields['page_counter'] = $page_e['counter'];
 		}
@@ -455,7 +455,7 @@ class GrabText extends Maintenance {
 			$this->dbw->update(
 				'page',
 				$insert_fields,
-				array( 'page_id' => $pageID ),
+				[ 'page_id' => $pageID ],
 				__METHOD__
 			);
 		}
@@ -479,7 +479,7 @@ class GrabText extends Maintenance {
 		$rowCount = $this->dbw->selectRowCount(
 			'revision',
 			'rev_id',
-			array( 'rev_id' => $revid ),
+			[ 'rev_id' => $revid ],
 			__METHOD__
 		);
 		if ( $rowCount ) {
@@ -521,7 +521,7 @@ class GrabText extends Maintenance {
 			$revdeleted = $revdeleted | Revision::DELETED_RESTRICTED;
 		}
 
-		$e = array(
+		$e = [
 			'id' => $revid,
 			'page' => $page_id,
 			'comment' => $comment,
@@ -537,7 +537,7 @@ class GrabText extends Maintenance {
 			'sha1' => Revision::base36Sha1( $text ),
 			'content_model' => null,
 			'content_format' => null
-		);
+		];
 
 		$e['text_id'] = $this->storeText( $text, $e['sha1'], $page_id, $revid );
 
@@ -553,7 +553,7 @@ class GrabText extends Maintenance {
 			}
 		}
 
-		$insert_fields = array(
+		$insert_fields = [
 			'rev_id' => $e['id'],
 			'rev_page' => $e['page'],
 			'rev_text_id' => $e['text_id'],
@@ -568,7 +568,7 @@ class GrabText extends Maintenance {
 			'rev_sha1' => $e['sha1'],
 			'rev_content_model' => $e['content_model'],
 			'rev_content_format' => $e['content_format'],
-		);
+		];
 
 		$this->output( sprintf( "Inserting revision %s\n", $e['id'] ) );
 		$this->dbw->insert(
@@ -582,19 +582,19 @@ class GrabText extends Maintenance {
 			foreach ( $revision['tags'] as $tag ) {
 				$this->dbw->insert(
 					'change_tag',
-					array(
+					[
 						'ct_rev_id' => $e['id'],
 						'ct_tag' => $tag,
-					),
+					],
 					__METHOD__
 				);
 			}
 			$this->dbw->insert(
 				'tag_summary',
-				array(
+				[
 					'ts_rev_id' => $e['id'],
 					'ts_tags' => implode( ',', $revision['tags'] ),
-				),
+				],
 				__METHOD__
 			);
 		}
@@ -625,14 +625,14 @@ class GrabText extends Maintenance {
 			# to reuse text rows on page moves, protections, etc
 			# Return the previous revision from that page
 			$row = $this->dbw->selectRow(
-				array( 'revision' ),
-				array( 'rev_id', 'rev_sha1', 'rev_text_id' ),
+				[ 'revision' ],
+				[ 'rev_id', 'rev_sha1', 'rev_text_id' ],
 				"rev_page = $pageID AND rev_id <= $revisionID",
 				__METHOD__,
-				array(
+				[
 					'LIMIT' => 1,
 					'ORDER BY' => 'rev_id DESC'
-				)
+				]
 			);
 
 			if ( $row && $row->rev_sha1 == $sha1 ) {
@@ -658,19 +658,19 @@ class GrabText extends Maintenance {
 			$flags .= 'external';
 		}
 
-		$e = array(
+		$e = [
 			'id' => $this->lastTextId,
 			'text' => $text,
 			'flags' => $flags
-		);
+		];
 
 		$this->dbw->insert(
 			'text',
-			array(
+			[
 				'old_id' => $e['id'],
 				'old_text' => $e['text'],
 				'old_flags' => $e['flags']
-			),
+			],
 			__METHOD__
 		);
 
@@ -703,10 +703,10 @@ class GrabText extends Maintenance {
 		}
 
 		# Get current title of the existing local page ID and move it to where it belongs
-		$params = array(
+		$params = [
 			'prop' => 'info',
 			'pageids' => $conflictingPageID
-		);
+		];
 		$result = $this->bot->query( $params );
 		$info_pages = array_values( $result['query']['pages'] );
 
@@ -737,12 +737,12 @@ class GrabText extends Maintenance {
 					$pageObj = (array)$this->dbw->selectRow(
 						'page',
 						'*',
-						array( 'page_id' => $resultingPageID ),
+						[ 'page_id' => $resultingPageID ],
 						__METHOD__
 					);
 					$this->dbw->delete(
 						'page',
-						array( 'page_id' => $resultingPageID ),
+						[ 'page_id' => $resultingPageID ],
 						__METHOD__
 					);
 				} else {
@@ -770,11 +770,11 @@ class GrabText extends Maintenance {
 			$this->output( "Moving page ID $conflictingPageID to $resultingPageTitle...\n" );
 			$this->dbw->update(
 				'page',
-				array(
+				[
 					'page_namespace' => $resultingNs,
 					'page_title' => $resultingTitle,
-				),
-				array( 'page_id' => $conflictingPageID ),
+				],
+				[ 'page_id' => $conflictingPageID ],
 				__METHOD__
 			);
 		}
@@ -791,10 +791,10 @@ class GrabText extends Maintenance {
 		$pageID = (int)$this->dbw->selectField(
 			'page',
 			'page_id',
-			array(
+			[
 				'page_namespace' => $ns,
 				'page_title' => $title,
-			),
+			],
 			__METHOD__
 		);
 		return $pageID;

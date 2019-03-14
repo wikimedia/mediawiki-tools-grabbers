@@ -74,7 +74,7 @@ class GrabUserBlocks extends Maintenance {
 		}
 
 		# Get a single DB_MASTER connection
-		$this->dbw = wfGetDB( DB_MASTER, array(), $this->getOption( 'db', $wgDBname ) );
+		$this->dbw = wfGetDB( DB_MASTER, [], $this->getOption( 'db', $wgDBname ) );
 
 		# bot class and log in if requested
 		if ( $user && $password ) {
@@ -100,13 +100,13 @@ class GrabUserBlocks extends Maintenance {
 			);
 		}
 
-		$params = array(
+		$params = [
 			'list' => 'blocks',
 			'bkdir' => 'newer',
 			'bkend' => $endDate,
 			'bklimit' => 'max',
 			'bkprop' => 'id|user|userid|by|byid|timestamp|expiry|reason|range|flags',
-		);
+		];
 
 		$more = true;
 		$bkstart = $startDate;
@@ -152,7 +152,7 @@ class GrabUserBlocks extends Maintenance {
 	public function processEntry( $entry ) {
 		$ts = wfTimestamp( TS_MW, $entry['timestamp'] );
 
-		$data = array(
+		$data = [
 			'ipb_id' => $entry['id'],
 			'ipb_address' => $entry['user'],
 			'ipb_user' => $entry['userid'],
@@ -170,7 +170,7 @@ class GrabUserBlocks extends Maintenance {
 			'ipb_deleted' => isset( $entry['hidden'] ),
 			'ipb_block_email' => isset( $entry['noemail'] ),
 			'ipb_allow_usertalk' => isset( $entry['allowusertalk'] ),
-		);
+		];
 		$this->dbw->insert( 'ipblocks', $data, __METHOD__ );
 		$this->dbw->commit();
 	}

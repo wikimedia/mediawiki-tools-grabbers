@@ -37,13 +37,13 @@ class GrabUserGroups extends Maintenance {
 	 * Groups we don't want to import...
 	 * @var array
 	 */
-	public $badGroups = array( '*', 'user', 'autoconfirmed' );
+	public $badGroups = [ '*', 'user', 'autoconfirmed' ];
 
 	/**
 	 * Groups we're going to import
 	 * @var array
 	 */
-	public $groups = array();
+	public $groups = [];
 
 	public function __construct() {
 		parent::__construct();
@@ -68,7 +68,7 @@ class GrabUserGroups extends Maintenance {
 			$this->groups = explode( '|', $providedGroups );
 		}
 		# Get a single DB_MASTER connection
-		$this->dbw = wfGetDB( DB_MASTER, array(), $this->getOption( 'db', $wgDBname ) );
+		$this->dbw = wfGetDB( DB_MASTER, [], $this->getOption( 'db', $wgDBname ) );
 
 		# bot class and log in if requested
 		if ( $user && $password ) {
@@ -96,18 +96,18 @@ class GrabUserGroups extends Maintenance {
 
 		$this->output( "Getting user group information.\n" );
 
-		$params = array(
+		$params = [
 			'list' => 'allusers',
 			'aulimit' => 'max',
 			'auprop' => 'groups',
 			'augroup' => implode( '|', $this->getGroups() )
-		);
+		];
 
 		$userCount = 0;
 
 		do {
 			$data = $this->bot->query( $params );
-			$stuff = array();
+			$stuff = [];
 			foreach ( $data['query']['allusers'] as $user ) {
 				if ( isset( $user['userid'] ) ) {
 					$userId = $user['userid'];
@@ -117,7 +117,7 @@ class GrabUserGroups extends Maintenance {
 				}
 				foreach ( $user['groups'] as $group ) {
 					if ( in_array( $group, $this->groups ) ) {
-						$stuff[] = array( 'ug_user' => $userId, 'ug_group' => $group );
+						$stuff[] = [ 'ug_user' => $userId, 'ug_group' => $group ];
 					}
 				}
 				$userCount++;
@@ -141,13 +141,13 @@ class GrabUserGroups extends Maintenance {
 	 * @return array
 	 */
 	public function getGroups() {
-		$params = array(
+		$params = [
 			'action' => 'query',
 			'meta' => 'siteinfo',
 			'siprop' => 'usergroups'
-		);
+		];
 		$data = $this->bot->query( $params );
-		$groups = array();
+		$groups = [];
 		foreach ( $data['query']['usergroups'] as $group ) {
 			if ( !in_array( $group['name'], $this->badGroups ) ) {
 				$groups[] = $group['name'];
@@ -173,7 +173,7 @@ class GrabUserGroups extends Maintenance {
 	 * @param array $rows
 	 */
 	public function insertRows( $rows ) {
-		$this->dbw->insert( 'user_groups', $rows, __METHOD__, array( 'IGNORE' ) );
+		$this->dbw->insert( 'user_groups', $rows, __METHOD__, [ 'IGNORE' ] );
 		$this->dbw->commit();
 	}
 }

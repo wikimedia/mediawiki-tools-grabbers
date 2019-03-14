@@ -43,13 +43,13 @@ class GrabFiles extends FileGrabber {
 			$this->endDate = wfTimestampNow();
 		}
 
-		$params = array(
+		$params = [
 			'generator' => 'allimages',
 			'gailimit' => 'max',
 			'prop' => 'imageinfo',
 			'iiprop' => 'timestamp|user|userid|comment|url|size|sha1|mime|metadata|archivename|bitdepth|mediatype',
 			'iilimit' => 'max'
-		);
+		];
 
 		$gaifrom = $this->getOption( 'from' );
 		$more = true;
