@@ -141,7 +141,7 @@ abstract class FileGrabber extends Maintenance {
 
 		$comment = $fileVersion['comment'];
 		if ( $comment ) {
-			$comment = $wgContLang->truncate( $comment, 255 );
+			$comment = $wgContLang->truncateForDatabase( $comment, 255 );
 		} else {
 			$comment = '';
 		}
@@ -229,7 +229,7 @@ abstract class FileGrabber extends Maintenance {
 		} else {
 			$comment = $fileVersion['comment'];
 			if ( $comment ) {
-				$comment = $wgContLang->truncate( $comment, 255 );
+				$comment = $wgContLang->truncateForDatabase( $comment, 255 );
 			} else {
 				$comment = '';
 			}

@@ -506,7 +506,7 @@ class GrabText extends Maintenance {
 		} else {
 			$comment = $revision['comment'];
 			if ( $comment ) {
-				$comment = $wgContLang->truncate( $comment, 255 );
+				$comment = $wgContLang->truncateForDatabase( $comment, 255 );
 			} else {
 				$comment = '';
 			}

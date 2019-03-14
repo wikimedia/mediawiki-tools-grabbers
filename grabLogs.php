@@ -254,7 +254,7 @@ class GrabLogs extends Maintenance {
 			'log_user_text' => $entry['user'],
 			'log_namespace' => $ns,
 			'log_title' => $title,
-			'log_comment' => $wgContLang->truncate( $entry['comment'], 255 ),
+			'log_comment' => $wgContLang->truncateForDatabase( $entry['comment'], 255 ),
 			'log_params' => $this->encodeLogParams( $entry ),
 			'log_deleted' => $revdeleted
 		];

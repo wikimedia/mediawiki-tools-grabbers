@@ -380,7 +380,7 @@ class GrabDeletedText extends Maintenance {
 			if ( isset( $revision['comment'] ) ) {
 				$comment = $revision['comment'];
 				if ( $comment ) {
-					$comment = $wgContLang->truncate( $comment, 255 );
+					$comment = $wgContLang->truncateForDatabase( $comment, 255 );
 				}
 			} else {
 				$comment = '';
