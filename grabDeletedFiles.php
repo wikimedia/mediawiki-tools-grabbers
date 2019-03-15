@@ -6,7 +6,7 @@
  * @file
  * @ingroup Maintenance
  * @author Calimonious the Estrange
- * @date 31 December 2012
+ * @date 15 March 2019
  * @note Based on code by Jack Phoenix and Edward Chernenko.
  */
 
@@ -134,9 +134,9 @@ class GrabDeletedFiles extends Maintenance {
 			# $imagesurl should be something like http://images.wikia.com/uncyclopedia/images
 			# Example image: http://images.wikia.com/uncyclopedia/images/deleted/a/b/c/abcblahhash.png
 			$fileurl = $imagesurl . '/deleted/' . $file[0] . '/' . $file[1] . '/' . $file[2] . '/' . $file;
-			wfSuppressWarnings();
+			Wikimedia\suppressWarnings();
 			$fileContent = file_get_contents( $fileurl );
-			wfRestoreWarnings();
+			Wikimedia\restoreWarnings();
 			if ( !$fileContent ) {
 				$this->output( "$fileName not found on remote server.\n" );
 				continue;
@@ -178,7 +178,8 @@ class GrabDeletedFiles extends Maintenance {
 		$e['fa_minor_mime'] = substr( $entry['mime'], $mimeBreak + 1 );
 
 		$e['fa_metadata'] = serialize( $entry['metadata'] );
-		$e['fa_storage_key'] = $this->str_sha1_36( $entry['sha1'] ) . '.' . pathinfo( $entry['name'], PATHINFO_EXTENSION );
+		$e['fa_storage_key'] = ltrim( Wikimedia\base_convert( $entry['sha1'], 16, 36, 40 ), '0' ) .
+			'.' . pathinfo( $entry['name'], PATHINFO_EXTENSION );
 
 		# We could get these other fields from logging, but they appear to have no purpose so SCREW IT.
 		$e['fa_deleted_user'] = 0;
@@ -189,30 +190,7 @@ class GrabDeletedFiles extends Maintenance {
 		$dbw = wfGetDB( DB_MASTER, [], $this->getOption( 'db', $wgDBname ) );
 
 		$dbw->insert( 'filearchive', $e, __METHOD__ );
-		$dbw->commit();
-
 		# $this->output( "Changes committed to the database!\n" );
-	}
-
-	# Base conversion function to make up for PHP's overwhelming crappiness
-	# (base_convert doesn't work with large numbers)
-	# Borrowed from some guy's comments on php.net...
-	function str_sha1_36( $str ) {
-		$str = trim( $str );
-
-		$len = strlen( $str );
-		$q = 0;
-		for ( $i = 0; $i < $len; $i++ ) {
-			$r = base_convert( $str[$i], 16, 10 );
-			$q = bcadd( bcmul( $q, 16 ), $r );
-		}
-		$s = '';
-			while ( bccomp( $q, '0', 0 ) > 0 ) {
-			$r = intval( bcmod( $q, 36 ) );
-			$s = base_convert( $r, 10, 36 ) . $s;
-			$q = bcdiv( $q, 36, 0 );
-		}
-		return $s;
 	}
 }
 
