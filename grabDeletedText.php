@@ -47,13 +47,6 @@ class GrabDeletedText extends Maintenance {
 	protected $lastTitle;
 
 	/**
-	 * Used when we should check for existing entries before inserting, to avoid duplicates
-	 *
-	 * @var bool
-	 */
-	protected $repair;
-
-	/**
 	 * API limits to use instead of max
 	 *
 	 * @var int
@@ -102,15 +95,12 @@ class GrabDeletedText extends Maintenance {
 		$this->addOption( 'apilimits', 'API limits to use. Maximum limits for the user will be used by default', false, true );
 		$this->addOption( 'lasttitle', 'Last title to get; useful for working around content with a namespace/interwiki on top of it in mw1.19-', false, true );
 		$this->addOption( 'badstart', 'Actual start point if bad drcontinues force having to continue from earlier (mw1.19- issue)', false, true );
-		$this->addOption( 'repair', 'Check for existing deleted revisions before inserting. Use if your archive table can ' .
-'			contain entries (for example, if you ran this script earlier)', false, false );
 		$this->addOption( 'namespaces', 'Pipe-separated namespaces (ID) to grab. Defaults to all namespaces', false, true );
 	}
 
 	public function execute() {
 		global $wgDBname;
 
-		$this->repair = $this->getOption( 'repair' );
 		$this->lastTitle = $this->getOption( 'lasttitle' );
 		$this->badStart = $this->getOption( 'badstart' );
 		$url = $this->getOption( 'url' );
@@ -259,6 +249,7 @@ class GrabDeletedText extends Maintenance {
 						}
 					}
 					$params['drcontinue'] = $drcontinue;
+
 				}
 				$result = $this->bot->query( $params );
 				if ( $result && isset( $result['error'] ) && $result['error']['code'] == 'drpermissiondenied' ) {
@@ -287,6 +278,7 @@ class GrabDeletedText extends Maintenance {
 					}
 					$more = !( $drcontinue === null );
 				}
+				$this->output( "drcontinue = $drcontinue\n" );
 			}
 			$this->output( "$nsRevisions chunks of revisions processed in namespace $ns.\n" );
 			$revisions_processed += $nsRevisions;
@@ -337,22 +329,6 @@ class GrabDeletedText extends Maintenance {
 			$timestamp = wfTimestamp( TS_MW, $revision['timestamp'] );
 			if ( $timestamp > $this->endDate ) {
 				return $nsRevisions;
-			}
-			# If this is a repair run, check if it's already present and skip if it is
-			if ( $this->repair ) {
-				$result = $this->dbw->selectField(
-					'archive',
-					'ar_title',
-					[
-						'ar_title' => $title,
-						'ar_timestamp' => $timestamp,
-						'ar_rev_id' => $revision['revid']
-					],
-					__METHOD__
-				);
-				if ( $result ) {
-					continue;
-				}
 			}
 
 			$text = $revision['*'];
@@ -409,10 +385,9 @@ class GrabDeletedText extends Maintenance {
 				'deleted' => $revdeleted,
 				'len' => strlen( $text ),
 				'sha1' => Revision::base36Sha1( $text ),
-				'parent_id' => $parentID
+				'parent_id' => $parentID,
+				'text_id' => $this->lastTextId + 1 // we actually increment it in the insertText if this insert works at all
 			];
-
-			$e['text_id'] = $this->storeText( $text, $e['sha1'] );
 
 			# $this->output( "Going to commit changes into the 'archive' table...\n" );
 
@@ -434,11 +409,19 @@ class GrabDeletedText extends Maintenance {
 					#'ar_page_id' => NULL, # Not requred and unreliable from api
 					'ar_parent_id' => $e['parent_id']
 				],
-				__METHOD__
+				__METHOD__,
+				[ 'IGNORE' ] // in case of duplicates?!
 			);
-			$this->dbw->commit();
+			if ( $this->dbw->affectedRows() === 0 ) {
+				$this->output( "Revision {$revision['revid']} already exists in archive table; skipping\n" );
+			} else {
+				if ( $e['text_id'] !== $this->storeText( $text, $e['sha1'] ) ) {
+					// I have no idea how this could possibly happen, but...
+					die( "AH FUCK text_id IS OUT OF SYNC PANIC\n" );
+				}
+				$nsRevisions++;
+			}
 
-			$nsRevisions++;
 			# $this->output( "Changes committed to the database!\n" );
 		}
 
