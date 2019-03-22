@@ -322,7 +322,7 @@ class GrabDeletedText extends Maintenance {
 
 		$revisions = $pageChunk['revisions'];
 		foreach ( $revisions as $revision ) {
-			if ( $nsRevisions % 500 == 0 ) {
+			if ( $nsRevisions % 500 == 0 && $nsRevisions !== 0 ) {
 				$this->output( "$nsRevisions revisions inserted\n" );
 			}
 			# Stop if past the enddate
