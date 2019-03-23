@@ -10,13 +10,7 @@
  * @note Based on code by Jack Phoenix and Edward Chernenko.
  */
 
-/**
- * Set the correct include path for PHP so that we can run this script from
- * $IP/grabbers/ and we don't need to move this file to $IP/maintenance/.
- */
-ini_set( 'include_path', __DIR__ . '/../maintenance' );
-
-require_once 'Maintenance.php';
+require_once __DIR__ . '/../maintenance/Maintenance.php';
 require_once 'includes/mediawikibot.class.php';
 require_once 'includes/mediawikibotHacks.php';
 

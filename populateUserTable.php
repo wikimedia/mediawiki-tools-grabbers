@@ -11,13 +11,7 @@
  * @date 20 July 2017
  */
 
-/**
- * Set the correct include path for PHP so that we can run this script from
- * $IP/grabbers/ and we don't need to move this file to $IP/maintenance/.
- */
-ini_set( 'include_path', __DIR__ . '/../maintenance' );
-
-require_once 'Maintenance.php';
+require_once __DIR__ . '/../maintenance/Maintenance.php';
 
 class PopulateUserTable extends Maintenance {
 
