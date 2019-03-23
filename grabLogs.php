@@ -72,7 +72,7 @@ class GrabLogs extends Maintenance {
 
 		$url = $this->getOption( 'url' );
 		if ( !$url ) {
-			$this->error( 'The URL to the target wiki\'s api.php is required!', 1 );
+			$this->fatalError( 'The URL to the target wiki\'s api.php is required!' );
 		}
 
 		# Get a single DB_MASTER connection
@@ -107,7 +107,7 @@ class GrabLogs extends Maintenance {
 			if ( !$this->bot->login() ) {
 				$this->output( "Logged in as $user...\n" );
 			} else {
-				$this->error( "Failed to log in as $user.\n", 1 );
+				$this->fatalError( "Failed to log in as $user." );
 			}
 		} else {
 			$this->bot = new MediaWikiBot(
@@ -130,14 +130,14 @@ class GrabLogs extends Maintenance {
 		if ( $lestart ) {
 			$lestart = wfTimestamp( TS_ISO_8601, $lestart );
 			if ( !$lestart ) {
-				$this->error( "Invalid start timestamp format.\n", 1 );
+				$this->fatalError( 'Invalid start timestamp format.' );
 			}
 		}
 		$leend = $this->getOption( 'end' );
 		if ( $leend ) {
 			$leend = wfTimestamp( TS_ISO_8601, $leend );
 			if ( !$leend ) {
-				$this->error( "Invalid end timestamp format.\n", 1 );
+				$this->fatalError( 'Invalid end timestamp format.' );
 			}
 		}
 		$more = true;

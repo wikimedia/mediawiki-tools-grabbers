@@ -37,7 +37,7 @@ class GrabFiles extends FileGrabber {
 		if ( $this->endDate ) {
 			$this->endDate = wfTimestamp( TS_MW, $this->endDate );
 			if ( !$this->endDate ) {
-				$this->error( "Invalid enddate format.\n", 1 );
+				$this->fatalError( 'Invalid enddate format.' );
 			}
 		} else {
 			$this->endDate = wfTimestampNow();
@@ -68,7 +68,7 @@ class GrabFiles extends FileGrabber {
 			}
 			$result = $this->bot->query( $params );
 			if ( empty( $result['query']['pages'] ) ) {
-				$this->error( 'No files found...', 1 );
+				$this->fatalError( 'No files found...' );
 			}
 
 			foreach ( $result['query']['pages'] as $file ) {

@@ -34,7 +34,7 @@ class GrabImages extends Maintenance {
 	public function execute() {
 		$wikiURL = $this->getOption( 'url' );
 		if ( !$wikiURL ) {
-			$this->error( 'The URL to the source wiki\'s api.php must be specified!', true );
+			$this->fatalError( 'The URL to the source wiki\'s api.php must be specified!' );
 		}
 
 		if ( $this->getOption( 'from' ) ) {
@@ -52,7 +52,7 @@ class GrabImages extends Maintenance {
 		wfMkdirParents( $folder );
 
 		if ( !file_exists( $folder ) ) {
-			$this->error( "Error creating temporary folder {$folder}\n", true );
+			$this->fatalError( "Error creating temporary folder {$folder}" );
 			return false;
 		}
 
@@ -103,10 +103,7 @@ class GrabImages extends Maintenance {
 
 			// No images -> bail out early
 			if ( empty( $data['query']['allimages'] ) ) {
-				$this->error(
-					'Got no images or other files -> nothing to do!',
-					true
-				);
+				$this->fatalError( 'Got no images or other files -> nothing to do!' );
 			}
 
 			$this->output( "In do loop (instance {$i})...\n" );

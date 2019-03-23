@@ -54,20 +54,20 @@ class GrabUserBlocks extends Maintenance {
 
 		$url = $this->getOption( 'url' );
 		if ( !$url ) {
-			$this->error( 'The URL to the target wiki\'s api.php is required!', 1 );
+			$this->fatalError( 'The URL to the target wiki\'s api.php is required!' );
 		}
 		$user = $this->getOption( 'username' );
 		$password = $this->getOption( 'password' );
 		$startDate = $this->getOption( 'startdate' );
 		if ( $startDate ) {
 			if ( !wfTimestamp( TS_ISO_8601, $startDate ) ) {
-				$this->error( "Invalid startdate format.\n", 1 );
+				$this->fatalError( 'Invalid startdate format.' );
 			}
 		}
 		$endDate = $this->getOption( 'enddate' );
 		if ( $endDate ) {
 			if ( !wfTimestamp( TS_ISO_8601, $endDate ) ) {
-				$this->error( "Invalid enddate format.\n", 1 );
+				$this->fatalError( 'Invalid enddate format.' );
 			}
 		} else {
 			$endDate = wfTimestampNow();
@@ -88,7 +88,7 @@ class GrabUserBlocks extends Maintenance {
 			if ( !$this->bot->login() ) {
 				$this->output( "Logged in as $user...\n" );
 			} else {
-				$this->error( "Failed to log in as $user.", 1 );
+				$this->fatalError( "Failed to log in as $user." );
 			}
 		} else {
 			$this->bot = new MediaWikiBot(
@@ -123,7 +123,7 @@ class GrabUserBlocks extends Maintenance {
 			$result = $this->bot->query( $params );
 
 			if ( empty( $result['query']['blocks'] ) ) {
-				$this->error( 'No blocks, hence nothing to do. Aborting the mission.', 1 );
+				$this->fatalError( 'No blocks, hence nothing to do. Aborting the mission.' );
 			}
 
 			foreach ( $result['query']['blocks'] as $logEntry ) {

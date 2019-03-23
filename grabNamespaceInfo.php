@@ -31,7 +31,7 @@ class GrabNamespaceInfo extends Maintenance {
 
 		$url = $this->getOption( 'url' );
 		if ( !$url ) {
-			$this->error( "The URL to the source wiki\'s api.php must be specified!\n", true );
+			$this->fatalError( 'The URL to the source wiki\'s api.php must be specified!' );
 		}
 
 		# bot class
@@ -59,7 +59,7 @@ class GrabNamespaceInfo extends Maintenance {
 		];
 		$result = $bot->query( $params );
 		if ( !$result['query'] ) {
-			$this->error( 'Got no namespaces...', true );
+			$this->fatalError( 'Got no namespaces...' );
 		}
 		$namespaces = $result['query']['namespaces'];
 		$customNamespaces = [];

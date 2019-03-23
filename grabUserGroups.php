@@ -59,7 +59,7 @@ class GrabUserGroups extends Maintenance {
 		global $wgDBname;
 		$url = $this->getOption( 'url' );
 		if ( !$url ) {
-			$this->error( 'The URL to the target wiki\'s api.php is required!', 1 );
+			$this->fatalError( 'The URL to the target wiki\'s api.php is required!' );
 		}
 		$user = $this->getOption( 'username' );
 		$password = $this->getOption( 'password' );
@@ -82,7 +82,7 @@ class GrabUserGroups extends Maintenance {
 			if ( !$this->bot->login() ) {
 				$this->output( "Logged in as $user...\n" );
 			} else {
-				$this->error( "Failed to log in as $user.", 1 );
+				$this->fatalError( "Failed to log in as $user." );
 			}
 		} else {
 			$this->bot = new MediaWikiBot(
@@ -158,8 +158,8 @@ class GrabUserGroups extends Maintenance {
 			$finalGroups = array_intersect( $this->groups, $groups );
 			$invalidGroups = array_values( array_diff( $this->groups, $groups ) );
 			if ( count( $invalidGroups ) ) {
-				$this->error( sprintf( 'Some of the provided groups don\'t exist on the wiki: %s',
-					implode( '|', $invalidGroups ) ), 1 );
+				$this->fatalError( sprintf( 'Some of the provided groups don\'t exist on the wiki: %s',
+					implode( '|', $invalidGroups ) ) );
 			}
 			$groups = $finalGroups;
 		}

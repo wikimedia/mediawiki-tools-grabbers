@@ -47,7 +47,7 @@ class GrabInterwikiMap extends Maintenance {
 
 		$url = $this->getOption( 'url' );
 		if ( !$url ) {
-			$this->error( 'The URL to the source wiki\'s api.php must be specified!', true );
+			$this->fatalError( 'The URL to the source wiki\'s api.php must be specified!' );
 		}
 		$user = $this->getOption( 'username' );
 		$password = $this->getOption( 'password' );
@@ -86,7 +86,7 @@ class GrabInterwikiMap extends Maintenance {
 
 		# No entries -> bail out early
 		if ( empty( $data['query']['interwikimap'] ) ) {
-			$this->error( 'The site\'s interwiki map is empty, can\'t import from it!', true );
+			$this->fatalError( 'The site\'s interwiki map is empty, can\'t import from it!' );
 		}
 
 		$dbw = wfGetDB( DB_MASTER );

@@ -65,7 +65,7 @@ class GrabAbuseFilter extends Maintenance {
 
 		$url = $this->getOption( 'url' );
 		if ( !$url ) {
-			$this->error( 'The URL to the target wiki\'s api.php is required!', 1 );
+			$this->fatalError( 'The URL to the target wiki\'s api.php is required!' );
 		}
 
 		# Get a single DB_MASTER connection
@@ -88,7 +88,7 @@ class GrabAbuseFilter extends Maintenance {
 			if ( !$this->bot->login() ) {
 				$this->output( "Logged in as $user...\n" );
 			} else {
-				$this->error( "Failed to log in as $user.\n", 1 );
+				$this->fatalError( "Failed to log in as $user." );
 			}
 		} else {
 			$this->bot = new MediaWikiBot(
