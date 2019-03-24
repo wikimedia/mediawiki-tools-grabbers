@@ -105,7 +105,7 @@ class GrabDeletedText extends Maintenance {
 		$this->badStart = $this->getOption( 'badstart' );
 		$url = $this->getOption( 'url' );
 		if ( !$url ) {
-			$this->error( "The URL to the source wiki\'s api.php must be specified!\n", 1 );
+			$this->fatalError( 'The URL to the source wiki\'s api.php must be specified!' );
 		}
 
 		$user = $this->getOption( 'username' );
@@ -116,7 +116,7 @@ class GrabDeletedText extends Maintenance {
 		if ( $this->endDate ) {
 			$this->endDate = wfTimestamp( TS_MW, $this->endDate );
 			if ( !$this->endDate ) {
-				$this->error( "Invalid enddate format.\n", 1 );
+				$this->fatalError( 'Invalid enddate format.' );
 			}
 		} else {
 			$this->endDate = wfTimestampNow();
@@ -161,10 +161,10 @@ class GrabDeletedText extends Maintenance {
 			#];
 			#$result = $this->bot->query( $params );
 			#if ( !in_array( 'deletedtext', $result['query']['allusers'][0]['rights'] ) ) {
-			#	$this->error( "$user does not have required rights to fetch deleted revisions.", 1 );
+			#	$this->fatalError( "$user does not have required rights to fetch deleted revisions." );
 			#}
 		} else {
-			$this->error( "Failed to log in as $user.", 1 );
+			$this->fatalError( "Failed to log in as $user." );
 		}
 
 		$this->output( "\n" );
@@ -180,7 +180,7 @@ class GrabDeletedText extends Maintenance {
 
 		# No data - bail out early
 		if ( empty( $siteinfo ) ) {
-			$this->error( 'No siteinfo data found...', 1 );
+			$this->fatalError( 'No siteinfo data found...' );
 		}
 
 		$textNamespaces = [];
@@ -195,7 +195,7 @@ class GrabDeletedText extends Maintenance {
 			}
 		}
 		if ( !$textNamespaces ) {
-			$this->error( 'Got no namespaces...', 1 );
+			$this->fatalError( 'Got no namespaces...' );
 		}
 
 		# Get deleted revisions
@@ -245,7 +245,7 @@ class GrabDeletedText extends Maintenance {
 					if ( isset( $params['drcontinue'] ) ) {
 						$oldcontinue = $params['drcontinue'];
 						if ( substr( str_replace( ' ', '_', $drcontinue ), 0, -15 ) < substr( str_replace( ' ', '_', $oldcontinue ), 0, -15 ) ) {
-							$this->error( 'Bad drcontinue; ' . str_replace( ' ', '_', $drcontinue ) . ' < ' . str_replace( ' ', '_', $oldcontinue ), 1 );
+							$this->fatalError( 'Bad drcontinue; ' . str_replace( ' ', '_', $drcontinue ) . ' < ' . str_replace( ' ', '_', $oldcontinue ) );
 						}
 					}
 					$params['drcontinue'] = $drcontinue;
@@ -253,7 +253,7 @@ class GrabDeletedText extends Maintenance {
 				}
 				$result = $this->bot->query( $params );
 				if ( $result && isset( $result['error'] ) && $result['error']['code'] == 'drpermissiondenied' ) {
-					$this->error( "$user does not have required rights to fetch deleted revisions.", 1 );
+					$this->fatalError( "$user does not have required rights to fetch deleted revisions." );
 				}
 				if ( empty( $result ) ) {
 					sleep( .5 );
@@ -316,7 +316,7 @@ class GrabDeletedText extends Maintenance {
 
 		# TODO: Document this whith examples if possible
 		if ( $this->lastTitle && ( str_replace( ' ', '_', $pageChunk['title'] ) > str_replace( ' ', '_', $this->lastTitle ) ) ) {
-			$this->error( "Stopping at {$pageChunk['title']}; lasttitle reached.\n", 1 );
+			$this->fatalError( "Stopping at {$pageChunk['title']}; lasttitle reached." );
 		}
 		$this->output( "Processing {$pageChunk['title']}\n" );
 
@@ -417,7 +417,7 @@ class GrabDeletedText extends Maintenance {
 			} else {
 				if ( $e['text_id'] !== $this->storeText( $text, $e['sha1'] ) ) {
 					// I have no idea how this could possibly happen, but...
-					die( "AH FUCK text_id IS OUT OF SYNC PANIC\n" );
+					$this->fatalError( 'AH FUCK text_id IS OUT OF SYNC PANIC' );
 				}
 				$nsRevisions++;
 			}

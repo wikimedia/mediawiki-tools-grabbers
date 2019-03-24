@@ -133,7 +133,7 @@ class GrabNewText extends Maintenance {
 
 		$url = $this->getOption( 'url' );
 		if ( !$url ) {
-			$this->error( "The URL to the source wiki\'s api.php must be specified!\n", 1 );
+			$this->fatalError( 'The URL to the source wiki\'s api.php must be specified!' );
 		}
 
 		$user = $this->getOption( 'username' );
@@ -142,15 +142,15 @@ class GrabNewText extends Maintenance {
 		$this->startDate = $this->getOption( 'startdate' );
 		if ( $this->startDate ) {
 			if ( !wfTimestamp( TS_ISO_8601, $this->startDate ) ) {
-				$this->error( "Invalid startdate format.\n", 1 );
+				$this->fatalError( 'Invalid startdate format.' );
 			}
 		} else {
-			$this->error( "A timestamp to start from is required.\n", 1 );
+			$this->fatalError( 'A timestamp to start from is required.' );
 		}
 		$this->endDate = $this->getOption( 'enddate' );
 		if ( $this->endDate ) {
 			if ( !wfTimestamp( TS_ISO_8601, $this->endDate ) ) {
-				$this->error( "Invalid enddate format.\n", 1 );
+				$this->fatalError( 'Invalid enddate format.' );
 			}
 		} else {
 			$this->endDate = wfTimestampNow();
@@ -197,7 +197,7 @@ class GrabNewText extends Maintenance {
 			if ( !$this->bot->login() ) {
 				$this->output( "Logged in as $user...\n" );
 			} else {
-				$this->error("Failed to log in as $user.", 1);
+				$this->fatalError( "Failed to log in as $user." );
 			}
 		} else {
 			$this->canSeeDeletedRevs = false;
@@ -499,7 +499,7 @@ class GrabNewText extends Maintenance {
 		$result = $this->bot->query( $params );
 
 		if ( ! $result || isset( $result['error'] ) ) {
-			$this->error( "Error getting revision information from API for page $pageDesignation.", 1 );
+			$this->fatalError( "Error getting revision information from API for page $pageDesignation." );
 			return;
 		}
 
@@ -636,7 +636,7 @@ class GrabNewText extends Maintenance {
 
 			$result = $this->bot->query( $params );
 			if ( ! $result || isset( $result['error'] ) ) {
-				$this->error( "Error getting revision information from API for page $pageDesignation.", 1 );
+				$this->fatalError( "Error getting revision information from API for page $pageDesignation." );
 				return;
 			}
 
@@ -1014,7 +1014,7 @@ class GrabNewText extends Maintenance {
 				$this->canSeeDeletedRevs = false;
 				return;
 			}
-			$this->error( "Error getting deleted revision information from API for page $pageTitle.", 1 );
+			$this->fatalError( "Error getting deleted revision information from API for page $pageTitle." );
 			return;
 		}
 
@@ -1039,7 +1039,7 @@ class GrabNewText extends Maintenance {
 
 			$result = $this->bot->query( $params );
 			if ( ! $result || isset( $result['error'] ) ) {
-				$this->error( "Error getting deleted revision information from API for page $pageTitle.", 1 );
+				$this->fatalError( "Error getting deleted revision information from API for page $pageTitle." );
 				return;
 			}
 
@@ -1193,7 +1193,7 @@ class GrabNewText extends Maintenance {
 			$result = $this->bot->query( $params );
 
 			if ( ! $result || isset( $result['error'] ) ) {
-				$this->error( "Error getting information from API for page ID $pageID", 1 );
+				$this->fatalError( "Error getting information from API for page ID $pageID" );
 				return;
 			}
 			$info_pages = array_values( $result['query']['pages'] );
@@ -1265,7 +1265,7 @@ class GrabNewText extends Maintenance {
 			$result = $this->bot->query( $params );
 
 			if ( ! $result || isset( $result['error'] ) ) {
-				$this->error( "Error getting information from API for page $sourceTitle", 1 );
+				$this->fatalError( "Error getting information from API for page $sourceTitle" );
 				return;
 			}
 			$info_pages = array_values( $result['query']['pages'] );

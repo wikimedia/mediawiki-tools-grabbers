@@ -58,17 +58,17 @@ class GrabNewFiles extends FileGrabber {
 		if ( $this->startDate ) {
 			$this->startDate = wfTimestamp( TS_MW, $this->startDate );
 			if ( !$this->startDate ) {
-				$this->error( "Invalid startdate format.\n", 1 );
+				$this->fatalError( 'Invalid startdate format.' );
 			}
 		} else {
-			$this->error( "A timestamp to start from is required.\n", 1 );
+			$this->fatalError( 'A timestamp to start from is required.' );
 		}
 
 		$this->endDate = $this->getOption( 'enddate' );
 		if ( $this->endDate ) {
 			$this->endDate = wfTimestamp( TS_MW, $this->endDate );
 			if ( !$this->endDate ) {
-				$this->error( "Invalid enddate format.\n", 1 );
+				$this->fatalError( 'Invalid enddate format.' );
 			}
 		} else {
 			$this->endDate = wfTimestampNow();
@@ -345,8 +345,8 @@ class GrabNewFiles extends FileGrabber {
 			# Use the user that performed the move for the deletion
 			$status = $file->delete( $reason, false, User::newFromId( $userId ) );
 			if ( !$status->isOK() ) {
-				$this->error( sprintf( "Failed to delete %s on move: %s\n",
-					$newName, implode( '. ', $status->getWikiText() ) ), 1 );
+				$this->fatalError( sprintf( "Failed to delete %s on move: %s",
+					$newName, implode( '. ', $status->getWikiText() ) ) );
 			}
 		}
 		# Perform the move if the file with old name exists
@@ -362,8 +362,8 @@ class GrabNewFiles extends FileGrabber {
 		# database. For instance, rename the file in image and oldimage
 		$status = $file->move( Title::makeTitle( NS_FILE, $newName ) );
 		if ( !$status->isOK() ) {
-			$this->error( sprintf( "Failed to move %s: %s\n",
-				$name, implode( '. ', $status->getWikiText() ) ), 1 );
+			$this->fatalError( sprintf( "Failed to move %s: %s",
+				$name, implode( '. ', $status->getWikiText() ) ) );
 		}
 		$this->output( "Done\n" );
 	}

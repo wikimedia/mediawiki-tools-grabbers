@@ -101,8 +101,8 @@ class PopulateUserTable extends Maintenance {
 			# Check that no invalid tables were provided
 			$invalidTables = array_diff( $this->tables, array_keys( $this->validTables ) );
 			if ( count( $invalidTables ) > 0 ) {
-				$this->error( sprintf( 'Invalid tables provided: %s',
-					implode( ',', $invalidTables ) ), 1 );
+				$this->fatalError( sprintf( 'Invalid tables provided: %s',
+					implode( ',', $invalidTables ) ) );
 			}
 		} else {
 			$this->tables = array_keys( $this->validTables );

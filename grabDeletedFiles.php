@@ -43,15 +43,15 @@ class GrabDeletedFiles extends Maintenance {
 		$imagesurl = $this->getOption( 'imagesurl' );
 		$scrape = $this->hasOption( 'scrape' );
 		if ( !$url ) {
-			$this->error( 'The URL to the target wiki\'s api.php is required.', true );
+			$this->fatalError( 'The URL to the target wiki\'s api.php is required.' );
 		}
 		if ( !$imagesurl && !$scrape ) {
-			$this->error( 'Unless we\'re screenscraping it, the URL to the target wiki\'s images directory is required.', true );
+			$this->fatalError( 'Unless we\'re screenscraping it, the URL to the target wiki\'s images directory is required.' );
 		}
 		$user = $this->getOption( 'username' );
 		$password = $this->getOption( 'password' );
 		if ( !$user || !$password ) {
-			$this->error( 'An admin username and password are required.', true );
+			$this->fatalError( 'An admin username and password are required.' );
 		}
 
 		$this->output( "Working...\n" );
@@ -78,10 +78,10 @@ class GrabDeletedFiles extends Maintenance {
 			#];
 			#$result = $bot->query( $params );
 			#if ( !in_array( 'deletedtext', $result['query']['allusers'][0]['rights'] ) ) {
-			#	$this->error( "$user does not have required rights to fetch deleted content.", true );
+			#	$this->fatalError( "$user does not have required rights to fetch deleted content." );
 			#}
 		} else {
-			$this->error( "Failed to log in as $user.", true );
+			$this->fatalError( "Failed to log in as $user." );
 		}
 
 		$skipMetaData = $this->hasOption( 'skipmetadata' );
@@ -106,7 +106,7 @@ class GrabDeletedFiles extends Maintenance {
 				}
 				$result = $bot->query( $params );
 				if ( empty( $result['query']['filearchive'] ) ) {
-					$this->error( 'No files found...', true );
+					$this->fatalError( 'No files found...' );
 				}
 
 				foreach ( $result['query']['filearchive'] as $fileVersion ) {

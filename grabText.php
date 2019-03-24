@@ -75,7 +75,7 @@ class GrabText extends Maintenance {
 
 		$url = $this->getOption( 'url' );
 		if ( !$url ) {
-			$this->error( "The URL to the source wiki\'s api.php must be specified!\n", 1 );
+			$this->fatalError( 'The URL to the source wiki\'s api.php must be specified!' );
 		}
 
 		$user = $this->getOption( 'username' );
@@ -84,7 +84,7 @@ class GrabText extends Maintenance {
 		$this->endDate = $this->getOption( 'enddate' );
 		if ( $this->endDate ) {
 			if ( !wfTimestamp( TS_ISO_8601, $this->endDate ) ) {
-				$this->error( "Invalid enddate format.\n", 1 );
+				$this->fatalError( 'Invalid enddate format.' );
 			}
 		} else {
 			$this->endDate = wfTimestampNow();
@@ -117,7 +117,7 @@ class GrabText extends Maintenance {
 			if ( !$this->bot->login() ) {
 				$this->output( "Logged in as $user...\n" );
 			} else {
-				$this->error( "Failed to log in as $user.\n", 1 );
+				$this->fatalError( "Failed to log in as $user." );
 			}
 		} else {
 			$this->bot = new MediaWikiBot(
@@ -143,7 +143,7 @@ class GrabText extends Maintenance {
 
 		# No data - bail out early
 		if ( empty( $siteinfo ) ) {
-			$this->error( 'No siteinfo data found', 1 );
+			$this->fatalError( 'No siteinfo data found' );
 		}
 
 		$textNamespaces = [];
@@ -160,7 +160,7 @@ class GrabText extends Maintenance {
 			}
 		}
 		if ( !$textNamespaces ) {
-			$this->error( 'Got no namespaces', 1 );
+			$this->fatalError( 'Got no namespaces' );
 		}
 
 		if ( $grabFromAllNamespaces ) {
@@ -175,7 +175,7 @@ class GrabText extends Maintenance {
 		if ( $start ) {
 			$title = Title::newFromText( $start );
 			if ( is_null( $title ) ) {
-				$this->error( 'Invalid title provided for the start parameter', 1 );
+				$this->fatalError( 'Invalid title provided for the start parameter' );
 			}
 			$this->output( sprintf( "Trying to resume import from page %s\n", $title ) );
 		}
@@ -285,7 +285,7 @@ class GrabText extends Maintenance {
 		$result = $this->bot->query( $params );
 
 		if ( ! $result || isset( $result['error'] ) ) {
-			$this->error( "Error getting revision information from API for page id $pageID.", 1 );
+			$this->fatalError( "Error getting revision information from API for page id $pageID." );
 			return;
 		}
 
@@ -413,7 +413,7 @@ class GrabText extends Maintenance {
 
 			$result = $this->bot->query( $params );
 			if ( ! $result || isset( $result['error'] ) ) {
-				$this->error( "Error getting revision information from API for page id $pageID.", 1 );
+				$this->fatalError( "Error getting revision information from API for page id $pageID." );
 				return;
 			}
 
