@@ -34,6 +34,7 @@ class GrabDeletedFiles extends Maintenance {
 		$this->addOption( 'fafrom', 'Start point from which to continue with metadata.', false, true, 'start' );
 		$this->addOption( 'skipmetadata', 'If you\'ve already populated oldarchive and just need to resume file downloads,'
 			. ' use this to avoid duplicating the metadata db entries', false, false, 'm' );
+		$this->addOption( 'from', 'Start point from which to continue file downloads. Must match an actual file record in the database.', false, true );
 	}
 
 	public function execute() {
@@ -139,6 +140,8 @@ class GrabDeletedFiles extends Maintenance {
 			__METHOD__
 		);
 
+		$from = $this->getOption( 'from' );
+
 		if ( $scrape ) {
 			# Get the URL for this
 			$queryGeneral = $bot->query( [ 'meta' => 'siteinfo' ] )['query']['general'];
@@ -148,6 +151,14 @@ class GrabDeletedFiles extends Maintenance {
 
 		foreach ( $result as $row ) {
 			$fileName = $row->fa_name;
+
+			# This is really stupid, but, er, whatever.
+			if ( $from !== null && $fileName !== $from ) {
+				continue;
+			} else {
+				$from = null;
+			}
+
 			$file = $row->fa_storage_key;
 			$fileLocalPath = $wgUploadDirectory . '/deleted/' . $file[0] . '/' . $file[1] . '/' . $file[2];
 
@@ -243,7 +254,7 @@ class GrabDeletedFiles extends Maintenance {
 				touch( $fileLocalPath . "/index.html" );
 			}
 			file_put_contents( $fileLocalPath . '/' . $file, $fileContent );
-			$this->output( ": successfully saved as $file.\n" );
+			$this->output( ": successfully saved as $file\n" );
 			if ( ( $count % 500 ) == 0 && $count !== 0 ) {
 				$this->output( "$count\n" );
 			}
