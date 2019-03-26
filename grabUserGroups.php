@@ -31,7 +31,11 @@ class GrabUserGroups extends Maintenance {
 	 * Groups we don't want to import...
 	 * @var array
 	 */
-	public $badGroups = [ '*', 'user', 'autoconfirmed' ];
+	public $badGroups = [
+		'*',
+		'user',
+		'autoconfirmed'
+	];
 
 	/**
 	 * Groups we're going to import
@@ -47,6 +51,7 @@ class GrabUserGroups extends Maintenance {
 		$this->addOption( 'password', 'Password on the target wiki', false, true, 'p' );
 		$this->addOption( 'groups', 'Get only a specific list of groups (pipe separated list of group names, by default everything except *, user and autoconfirmed)', false, true );
 		$this->addOption( 'db', 'Database name, if we don\'t want to write to $wgDBname', false, true );
+		$this->addOption( 'wikia', 'Set this param if the target wiki is on Wikia, which uses a different API', false, false );
 	}
 
 	public function execute() {
@@ -90,43 +95,99 @@ class GrabUserGroups extends Maintenance {
 
 		$this->output( "Getting user group information.\n" );
 
-		$params = [
-			'list' => 'allusers',
-			'aulimit' => 'max',
-			'auprop' => 'groups',
-			'augroup' => implode( '|', $this->getGroups() )
-		];
+		# TODO Less redundant switch ...
+		# Wikia has a custom api module for this, because they accidentally removed the original
+		if ( $this->getOption( 'wikia' ) ) {
+			# They have a few extra usergroups we probably don't want...
+			$this->badGroups = array_merge( $this->badGroups, [
+				'authenticated',
+				'bot-global',
+				'chatmoderator',
+				'content-reviewer',
+				'content-volunteer',
+				'council',
+				'fandom-editor',
+				'global-discussions-moderator',
+				'helper',
+				'request-to-be-forgotten-admin',
+				'reviewer',
+				'restricted-login',
+				'restricted-login-exempt',
+				'staff',
+				'threadmoderator',
+				'translator',
+				'util',
+				'vanguard',
+				'voldev',
+				'vstf'
+			] );
 
-		$userCount = 0;
+			$params = [
+				'list' => 'groupmembers',
+				'gmgroups' => implode( '|', $this->getGroups() ),
+				'gmlimit' => 'max',
+			];
 
-		do {
-			$data = $this->bot->query( $params );
-			$stuff = [];
-			foreach ( $data['query']['allusers'] as $user ) {
-				if ( isset( $user['userid'] ) ) {
-					$userId = $user['userid'];
-				} elseif ( isset( $user['id'] ) ) {
-					# Because Wikia is different
-					$userId = $user['id'];
-				}
-				foreach ( $user['groups'] as $group ) {
-					if ( in_array( $group, $this->groups ) ) {
-						$stuff[] = [ 'ug_user' => $userId, 'ug_group' => $group ];
+			$userCount = 0;
+
+			do {
+				$data = $this->bot->query( $params );
+				$stuff = [];
+
+				foreach( $data['users'] as $user ) {
+					foreach ( $user['groups'] as $group ) {
+						if ( in_array( $group, $this->groups ) ) {
+							$stuff[] = [ 'ug_user' => $user['userid'], 'ug_group' => $group ];
+						}
 					}
+					$userCount++;
 				}
-				$userCount++;
-			}
-			if ( count( $stuff ) ) {
-				$this->insertRows( $stuff );
-			}
-			if ( isset( $data['query-continue'] ) ) {
-				// @todo don't hardcode parameter names
-				$params['aufrom'] = $data['query-continue']['allusers']['aufrom'];
-				$more = true;
-			} else {
-				$more = false;
-			}
-		} while ( $more );
+
+				if ( count( $stuff ) ) {
+					$this->insertRows( $stuff );
+				}
+				if ( isset( $data['query-continue'] ) ) {
+					$params['gmoffset'] = $data['query-continue']['groupmembers']['gmoffset'];
+					$more = true;
+				} else {
+					$more = false;
+				}
+			} while ( $more );
+		} else {
+			$params = [
+				'list' => 'allusers',
+				'aulimit' => 'max',
+				'auprop' => 'groups',
+				'augroup' => implode( '|', $this->getGroups() )
+			];
+
+			$userCount = 0;
+
+			do {
+				$data = $this->bot->query( $params );
+				$stuff = [];
+
+				foreach ( $data['query']['allusers'] as $user ) {
+					foreach ( $user['groups'] as $group ) {
+						if ( in_array( $group, $this->groups ) ) {
+							$stuff[] = [ 'ug_user' => $user['userid'], 'ug_group' => $group ];
+						}
+					}
+					$userCount++;
+				}
+
+				if ( count( $stuff ) ) {
+					$this->insertRows( $stuff );
+				}
+				if ( isset( $data['query-continue'] ) ) {
+					// @todo don't hardcode parameter names
+					$params['aufrom'] = $data['query-continue']['allusers']['aufrom'];
+					$more = true;
+				} else {
+					$more = false;
+				}
+			} while ( $more );
+		}
 
 		$this->output( "Processed $userCount users.\n" );
 	}
