@@ -314,6 +314,9 @@ class GrabText extends Maintenance {
 		$page_e['namespace'] = $info_pages[0]['ns'];
 		$page_e['title'] = $this->sanitiseTitle( $info_pages[0]['ns'], $info_pages[0]['title'] );
 
+		# We kind of need this to resume...
+		$this->output( "Title: {$page_e['title']} in namespace {$page_e['namespace']}\n" );
+
 		# Get other information from api info
 		$page_e['is_redirect'] = ( isset( $info_pages[0]['redirect'] ) ? 1 : 0 );
 		$page_e['is_new'] = ( isset( $info_pages[0]['new'] ) ? 1 : 0 );
