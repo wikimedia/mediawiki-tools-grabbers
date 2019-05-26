@@ -9,16 +9,17 @@
  * @ingroup Maintenance
  * @author Jack Phoenix <jack@shoutwiki.com>,
  *         Jesús Martínez <martineznovo@gmail.com>
- * @version 1.0
- * @date 20 June 2012
+ * @version 2.0
+ * @date 5 August 2019
  * @note Based on code by:
  * - Edward Chernenko <edwardspec@gmail.com> (MediaWikiDumper 1.1.5, logs.pl)
  */
 
-require_once __DIR__ . '/../maintenance/Maintenance.php';
-require_once 'includes/mediawikibot.class.php';
+use MediaWiki\Linker\LinkTarget;
 
-class GrabLogs extends Maintenance {
+require_once 'includes/ExternalWikiGrabber.php';
+
+class GrabLogs extends ExternalWikiGrabber {
 
 	/**
 	 * API limits to use instead of max
@@ -34,43 +35,17 @@ class GrabLogs extends Maintenance {
 	 */
 	protected $validLogTypes;
 
-	/**
-	 * Handle to the database connection
-	 *
-	 * @var DatabaseBase
-	 */
-	protected $dbw;
-
-	/**
-	 * MediaWikiBot instance
-	 *
-	 * @var MediaWikiBot
-	 */
-	protected $bot;
-
 	public function __construct() {
 		parent::__construct();
 		$this->mDescription = 'Grabs logs from a pre-existing wiki into a new wiki.';
-		$this->addOption( 'url', 'URL to the target wiki\'s api.php', true /* required? */, true /* withArg */, 'u' );
-		$this->addOption( 'username', 'Username to log into the target wiki', false, true, 'n' );
-		$this->addOption( 'password', 'Password on the target wiki', false, true, 'p' );
-		$this->addOption( 'db', 'Database name, if we don\'t want to write to $wgDBname', false, true );
-		$this->addOption( 'start', 'Start point (20121222142317, 2012-12-22T14:23:17T, etc)', false, true );
-		$this->addOption( 'end', 'Log time at which to stop (20121222142317, 2012-12-22T14:23:17T, etc)', false, true );
+		$this->addOption( 'start', 'Start point (20121222142317, 2012-12-22T14:23:17Z, etc)', false, true );
+		$this->addOption( 'end', 'Log time at which to stop (20121222142317, 2012-12-22T14:23:17Z, etc)', false, true );
 		$this->addOption( 'apilimits', 'API limits to use. Maximum limits for the user will be used by default', false, true );
 		$this->addOption( 'logtypes', 'Process only logs of those types (pipe separated list). All logs will be processed by default', false, true );
 	}
 
 	public function execute() {
-		global $wgDBname;
-
-		$url = $this->getOption( 'url' );
-		if ( !$url ) {
-			$this->fatalError( 'The URL to the target wiki\'s api.php is required!' );
-		}
-
-		# Get a single DB_MASTER connection
-		$this->dbw = wfGetDB( DB_MASTER, [], $this->getOption( 'db', $wgDBname ) );
+		parent::execute();
 
 		$apiLimits = $this->getOption( 'apilimits' );
 		if ( !is_null( $apiLimits ) && is_numeric( $apiLimits ) && (int)$apiLimits > 0 ) {
@@ -82,35 +57,6 @@ class GrabLogs extends Maintenance {
 		$validLogTypes = $this->getOption( 'logtypes' );
 		if ( !is_null( $validLogTypes ) ) {
 			$this->validLogTypes = explode( '|', $validLogTypes );
-		}
-
-		$user = $this->getOption( 'username' );
-		$password = $this->getOption( 'password' );
-
-		$this->output( "Working...\n" );
-
-		# bot class and log in if requested
-		if ( $user && $password ) {
-			$this->bot = new MediaWikiBot(
-				$url,
-				'json',
-				$user,
-				$password,
-				'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:13.0) Gecko/20100101 Firefox/13.0.1'
-			);
-			if ( !$this->bot->login() ) {
-				$this->output( "Logged in as $user...\n" );
-			} else {
-				$this->fatalError( "Failed to log in as $user." );
-			}
-		} else {
-			$this->bot = new MediaWikiBot(
-				$url,
-				'json',
-				'',
-				'',
-				'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:13.0) Gecko/20100101 Firefox/13.0.1'
-			);
 		}
 
 		$params = [
@@ -199,8 +145,6 @@ class GrabLogs extends Maintenance {
 	}
 
 	public function processEntry( $entry ) {
-		global $wgContLang;
-
 		# Handler for reveleted stuff or some such
 		$revdeleted = 0;
 		if ( isset( $entry['actionhidden'] ) ) {
@@ -244,14 +188,16 @@ class GrabLogs extends Maintenance {
 			'log_type' => $entry['type'],
 			'log_action' => $entry['action'],
 			'log_timestamp' => $ts,
-			'log_user' => $entry['userid'],
-			'log_user_text' => $entry['user'],
 			'log_namespace' => $ns,
 			'log_title' => $title,
-			'log_comment' => $wgContLang->truncateForDatabase( $entry['comment'], 255 ),
+			# This is now handled using builtin MediaWiki code below...
+			#'log_user' => $entry['userid'],
+			#'log_user_text' => $entry['user'],
+			#'log_comment' => $wgContLang->truncateForDatabase( $entry['comment'], 255 ),
 			'log_params' => $this->encodeLogParams( $entry ),
 			'log_deleted' => $revdeleted
 		];
+
 		# May not be set in older MediaWiki instances. This field can be null
 		# Note that it contains the page id at the time the log was inserted,
 		# not the current page id of the title.
@@ -259,30 +205,17 @@ class GrabLogs extends Maintenance {
 			$e['log_page'] = $entry['logpage'];
 		}
 
-		# $this->output( "Going to commit...\n" );
+		# Bits of code picked from ManualLogEntry::insert()
+		$e += CommentStore::getStore()->insert( $this->dbw, 'log_comment', $entry['comment'] );
+		$performer = User::newFromIdentity( $this->getUserIdentity( (int)$entry['userid'], $entry['user'] ) );
+		$e += ActorMigration::newMigration()
+			->getInsertValues( $this->dbw, 'log_user', $performer );
 
 		$this->dbw->insert( 'logging', $e, __METHOD__ );
 
 		# Insert tags, if any
 		if ( isset( $entry['tags'] ) && count( $entry['tags'] ) > 0 ) {
-			foreach ( $entry['tags'] as $tag ) {
-				$this->dbw->insert(
-					'change_tag',
-					[
-						'ct_log_id' => $e['log_id'],
-						'ct_tag' => $tag,
-					],
-					__METHOD__
-				);
-			}
-			$this->dbw->insert(
-				'tag_summary',
-				[
-					'ts_log_id' => $e['log_id'],
-					'ts_tags' => implode( ',', $entry['tags'] ),
-				],
-				__METHOD__
-			);
+			$this->insertTags( $entry['tags'], null, $entry['logid']);
 		}
 
 		$this->dbw->commit();
@@ -499,7 +432,7 @@ class GrabLogs extends Maintenance {
 	 * @return array Modified array
 	 */
 	private function mapToTransformations( $origin, $passThroughKeys, $timestampKeys = [], $booleanKeys = [] ) {
-		$transformed = array_map( function( $item ) use ( $passThroughKeys, $timestampKeys ) {
+		$transformed = array_map( function( $item ) use ( $passThroughKeys, $timestampKeys, $booleanKeys ) {
 			$result = [];
 			foreach ( $passThroughKeys as $key ) {
 				if ( isset( $item[$key] ) ) {
@@ -534,21 +467,6 @@ class GrabLogs extends Maintenance {
 			return 'max';
 		}
 		return $this->apiLimits;
-	}
-
-	/**
-	 * Strips the namespace from the title, if namespace number is different than 0,
-	 *  and converts spaces to underscores. For use in database
-	 *
-	 * @param int $ns Namespace number
-	 * @param string $title Title of the page with the namespace
-	 */
-	function sanitiseTitle( $ns, $title ) {
-		if ( $ns != 0 ) {
-			$title = preg_replace( '/^[^:]*?:/', '', $title );
-		}
-		$title = str_replace( ' ', '_', $title );
-		return $title;
 	}
 }
 

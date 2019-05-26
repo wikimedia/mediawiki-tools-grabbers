@@ -8,14 +8,13 @@
  * @file
  * @ingroup Maintenance
  * @author Jesús Martínez <martineznovo@gmail.com>
- * @version 1.0
- * @date 10 August 2017
+ * @version 1.1
+ * @date 5 August 2019
  */
 
-require_once __DIR__ . '/../maintenance/Maintenance.php';
-require_once 'includes/mediawikibot.class.php';
+require_once 'includes/ExternalWikiGrabber.php';
 
-class GrabAbuseFilter extends Maintenance {
+class GrabAbuseFilter extends ExternalWikiGrabber {
 
 	/**
 	 * API limits to use instead of max
@@ -31,68 +30,15 @@ class GrabAbuseFilter extends Maintenance {
 	 */
 	protected $validLogTypes;
 
-	/**
-	 * Handle to the database connection
-	 *
-	 * @var DatabaseBase
-	 */
-	protected $dbw;
-
-	/**
-	 * MediaWikiBot instance
-	 *
-	 * @var MediaWikiBot
-	 */
-	protected $bot;
-
 	public function __construct() {
 		parent::__construct();
 		$this->mDescription = 'Grabs logs from a pre-existing wiki into a new wiki.';
-		$this->addOption( 'url', 'URL to the target wiki\'s api.php', true /* required? */, true /* withArg */, 'u' );
-		$this->addOption( 'username', 'Username to log into the target wiki', false, true, 'n' );
-		$this->addOption( 'password', 'Password on the target wiki', false, true, 'p' );
-		$this->addOption( 'db', 'Database name, if we don\'t want to write to $wgDBname', false, true );
 	}
 
 	public function execute() {
-		global $wgDBname;
-
-		$url = $this->getOption( 'url' );
-		if ( !$url ) {
-			$this->fatalError( 'The URL to the target wiki\'s api.php is required!' );
-		}
-
-		# Get a single DB_MASTER connection
-		$this->dbw = wfGetDB( DB_MASTER, [], $this->getOption( 'db', $wgDBname ) );
-
-		$user = $this->getOption( 'username' );
-		$password = $this->getOption( 'password' );
+		parent::execute();
 
 		$this->output( "Working...\n" );
-
-		# bot class and log in if requested
-		if ( $user && $password ) {
-			$this->bot = new MediaWikiBot(
-				$url,
-				'json',
-				$user,
-				$password,
-				'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:13.0) Gecko/20100101 Firefox/13.0.1'
-			);
-			if ( !$this->bot->login() ) {
-				$this->output( "Logged in as $user...\n" );
-			} else {
-				$this->fatalError( "Failed to log in as $user." );
-			}
-		} else {
-			$this->bot = new MediaWikiBot(
-				$url,
-				'json',
-				'',
-				'',
-				'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:13.0) Gecko/20100101 Firefox/13.0.1'
-			);
-		}
 
 		$params = [
 			'list' => 'abusefilters',

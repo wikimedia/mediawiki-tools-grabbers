@@ -8,21 +8,13 @@
  * @author Jack Phoenix <jack@shoutwiki.com>
  * @author Calimonious the Estrange
  * @author Jesús Martínez <martineznovo@gmail.com>
- * @version 1.0
- * @date 1 January 2013
+ * @version 1.1
+ * @date 5 August 2019
  */
 
-require_once __DIR__ . '/../maintenance/Maintenance.php';
-require_once 'includes/mediawikibot.class.php';
+require_once 'includes/TextGrabber.php';
 
-class GrabNewText extends Maintenance {
-
-	/**
-	 * Whether our wiki supports page counters, to use counters if remote wiki also has them
-	 *
-	 * @var bool
-	 */
-	protected $supportsCounters;
+class GrabNewText extends TextGrabber {
 
 	/**
 	 * Start date
@@ -32,13 +24,6 @@ class GrabNewText extends Maintenance {
 	protected $startDate;
 
 	/**
-	 * End date
-	 *
-	 * @var string
-	 */
-	protected $endDate;
-
-	/**
 	 * Last revision in the current db
 	 *
 	 * @var int
@@ -46,32 +31,11 @@ class GrabNewText extends Maintenance {
 	protected $lastRevision = 0;
 
 	/**
-	 * Last text id in the current db
-	 *
-	 * @var int
-	 */
-	protected $lastTextId = 0;
-
-	/**
 	 * Array of namespaces to grab changes
 	 *
 	 * @var Array
 	 */
 	protected $namespaces = null;
-
-	/**
-	 * Handle to the database connection
-	 *
-	 * @var DatabaseBase
-	 */
-	protected $dbw;
-
-	/**
-	 * MediaWikiBot instance
-	 *
-	 * @var MediaWikiBot
-	 */
-	protected $bot;
 
 	/**
 	 * A list of page ids already processed. Don't get new edits for those
@@ -112,26 +76,13 @@ class GrabNewText extends Maintenance {
 	public function __construct() {
 		parent::__construct();
 		$this->mDescription = "Grab new changes from an external wiki and add it over an imported dump.\nFor use when the available dump is slightly out of date.";
-		$this->addOption( 'url', 'URL to the target wiki\'s api.php', true /* required? */, true /* withArg */, 'u' );
-		$this->addOption( 'username', 'Username to log into the target wiki', false, true, 'n' );
-		$this->addOption( 'password', 'Password on the target wiki', false, true, 'p' );
-		$this->addOption( 'db', 'Database name, if we don\'t want to write to $wgDBname', false, true );
-		$this->addOption( 'startdate', 'Start point (20121222142317, 2012-12-22T14:23:17T, etc); note that this cannot go back further than 1-3 months on most projects', true, true );
-		$this->addOption( 'enddate', 'End point (20121222142317, 2012-12-22T14:23:17T, etc); defaults to current timestamp. May leave pages in inconsistent state if page moves are involved', false, true );
+		$this->addOption( 'startdate', 'Start point (20121222142317, 2012-12-22T14:23:17Z, etc); note that this cannot go back further than 1-3 months on most projects', true, true );
 		$this->addOption( 'namespaces', 'A pipe-separated list of namespaces (ID) to grab changes from. Defaults to all namespaces', false, true );
 		$this->addOption( 'wikia', 'Set this param if the target wiki is on Wikia, to perform some optimizations', false, false );
 	}
 
 	public function execute() {
-		global $wgDBname;
-
-		$url = $this->getOption( 'url' );
-		if ( !$url ) {
-			$this->fatalError( 'The URL to the source wiki\'s api.php must be specified!' );
-		}
-
-		$user = $this->getOption( 'username' );
-		$password = $this->getOption( 'password' );
+		parent::execute();
 
 		$this->startDate = $this->getOption( 'startdate' );
 		if ( $this->startDate ) {
@@ -141,24 +92,11 @@ class GrabNewText extends Maintenance {
 		} else {
 			$this->fatalError( 'A timestamp to start from is required.' );
 		}
-		$this->endDate = $this->getOption( 'enddate' );
-		if ( $this->endDate ) {
-			if ( !wfTimestamp( TS_ISO_8601, $this->endDate ) ) {
-				$this->fatalError( 'Invalid enddate format.' );
-			}
-		} else {
-			$this->endDate = wfTimestampNow();
-		}
 
 		if ( $this->hasOption( 'namespaces' ) ) {
 			$this->namespaces = explode( '|', $this->getOption( 'namespaces' ) );
 		}
 
-		# Get a single DB_MASTER connection
-		$this->dbw = wfGetDB( DB_MASTER, [], $this->getOption( 'db', $wgDBname ) );
-
-		# Check if wiki supports page counters (removed from core in 1.25)
-		$this->supportsCounters = $this->dbw->fieldExists( 'page', 'page_counter', __METHOD__ );
 		$this->isWikia = $this->getOption( 'wikia' );
 
 		# Get last revision id to avoid duplicates
@@ -169,40 +107,6 @@ class GrabNewText extends Maintenance {
 			__METHOD__,
 			[ 'ORDER BY' => 'rev_id DESC' ]
 		);
-
-		# Get last text id
-		$this->lastTextId = (int)$this->dbw->selectField(
-			'text',
-			'old_id',
-			[],
-			__METHOD__,
-			[ 'ORDER BY' => 'old_id DESC' ]
-		);
-
-		# bot class and log in if requested
-		if ( $user && $password ) {
-			$this->bot = new MediaWikiBot(
-				$url,
-				'json',
-				$user,
-				$password,
-				'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:13.0) Gecko/20100101 Firefox/13.0.1'
-			);
-			if ( !$this->bot->login() ) {
-				$this->output( "Logged in as $user...\n" );
-			} else {
-				$this->fatalError( "Failed to log in as $user." );
-			}
-		} else {
-			$this->canSeeDeletedRevs = false;
-			$this->bot = new MediaWikiBot(
-				$url,
-				'json',
-				'',
-				'',
-				'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:13.0) Gecko/20100101 Firefox/13.0.1'
-			);
-		}
 
 		$this->output( "\n" );
 
@@ -355,11 +259,11 @@ class GrabNewText extends Maintenance {
 						$this->processMove( $newns, $newTitle );
 
 					} elseif ( $logEntry['type'] == 'delete' && $logEntry['action'] == 'delete' ) {
-						if ( ! in_array( (string)$sourceTitle, $this->movedTitles ) ) {
+						if ( !in_array( (string)$sourceTitle, $this->movedTitles ) ) {
 							$this->output( "$sourceTitle was deleted; updating...\n" );
 							# Delete our copy, move revisions -> archive
 							$pageID = $this->getPageID( $ns, $title );
-							if ( ! $pageID ) {
+							if ( !$pageID ) {
 								# Page may be created and then deleted before we processed recentchanges
 								$this->output( "Page $sourceTitle not found in database, nothing to delete.\n" );
 								# Update deleted revisions from remote wiki anyway
@@ -384,7 +288,7 @@ class GrabNewText extends Maintenance {
 							'protection' => true,
 						];
 						$this->processPage( $pageInfo, null, false );
-						if ( ! in_array( $pageID, $this->pagesProcessed ) ) {
+						if ( !in_array( $pageID, $this->pagesProcessed ) ) {
 							$this->pagesProcessed[] = $pageID;
 						}
 						$this->output( "$sourceTitle processed.\n" );
@@ -401,7 +305,7 @@ class GrabNewText extends Maintenance {
 							'protection' => true,
 						];
 						$this->processPage( $pageInfo );
-						if ( ! in_array( $pageID, $this->pagesProcessed ) ) {
+						if ( !in_array( $pageID, $this->pagesProcessed ) ) {
 							$this->pagesProcessed[] = $pageID;
 						}
 					} elseif ( $logEntry['type'] == 'protect' ) {
@@ -420,11 +324,11 @@ class GrabNewText extends Maintenance {
 									[ 'pr_page' => $pageID ],
 									__METHOD__
 								);
-							} elseif ( ! in_array( $pageID, $this->pagesProtected ) ) {
+							} elseif ( !in_array( $pageID, $this->pagesProtected ) ) {
 								$pageInfo['protection'] = true;
 							}
 							$this->processPage( $pageInfo, $this->startDate );
-							if ( ! in_array( $pageID, $this->pagesProcessed ) ) {
+							if ( !in_array( $pageID, $this->pagesProcessed ) ) {
 								$this->pagesProcessed[] = $pageID;
 							}
 						}
@@ -459,7 +363,7 @@ class GrabNewText extends Maintenance {
 		$pageID = $page['pageid'];
 		$pageTitle = null;
 		$pageDesignation = "id $pageID";
-		if ( ! $pageID ) {
+		if ( !$pageID ) {
 			# We don't have page id... we need to use page title
 			$pageTitle = (string)Title::makeTitle( $page['ns'], $page['title'] );
 			$pageDesignation = $pageTitle;
@@ -492,7 +396,7 @@ class GrabNewText extends Maintenance {
 
 		$result = $this->bot->query( $params );
 
-		if ( ! $result || isset( $result['error'] ) ) {
+		if ( !$result || isset( $result['error'] ) ) {
 			$this->fatalError( "Error getting revision information from API for page $pageDesignation." );
 			return;
 		}
@@ -532,6 +436,7 @@ class GrabNewText extends Maintenance {
 		# Get it from the returned value from api
 		$page_e['namespace'] = $info_pages[0]['ns'];
 		$page_e['title'] = $this->sanitiseTitle( $info_pages[0]['ns'], $info_pages[0]['title'] );
+		$title = Title::makeTitle( $page_e['namespace'], $page_e['title'] );
 
 		# Get other information from api info
 		$page_e['is_redirect'] = ( isset( $info_pages[0]['redirect'] ) ? 1 : 0 );
@@ -543,7 +448,7 @@ class GrabNewText extends Maintenance {
 		if ( $wgContentHandlerUseDB && isset( $info_pages[0]['contentmodel'] ) ) {
 			# This would be the most accurate way of getting the content model for a page.
 			# However it calls hooks and can be incredibly slow or cause errors
-			#$defaultModel = ContentHandler::getDefaultModelFor( Title:makeTitle( $page_e['namespace'], $page_e['title'] ) );
+			#$defaultModel = ContentHandler::getDefaultModelFor( $title );
 			$defaultModel = MWNamespace::getNamespaceContentModel( $info_pages[0]['ns'] ) || CONTENT_MODEL_WIKITEXT;
 			# Set only if not the default content model
 			if ( $defaultModel != $info_pages[0]['contentmodel'] ) {
@@ -566,7 +471,7 @@ class GrabNewText extends Maintenance {
 		# If page is not present, check if title is present, because we can't insert
 		# a duplicate title. That would mean the page was moved leaving a redirect but
 		# we haven't processed the move yet
-		if ( ! $pageIsPresent ) {
+		if ( !$pageIsPresent ) {
 			$conflictingPageID = $this->getPageID( $page_e['namespace'], $page_e['title'] );
 			if ( $conflictingPageID ) {
 				# Whoops...
@@ -614,10 +519,11 @@ class GrabNewText extends Maintenance {
 		$revisionsProcessed = false;
 		while ( true ) {
 			foreach ( $info_pages[0]['revisions'] as $revision ) {
-				if ( ! $skipPrevious || $revision['revid'] > $this->lastRevision) {
-					$revisionsProcessed = $this->processRevision( $revision, $pageID, $defaultModel ) || $revisionsProcessed;
+				if ( !$skipPrevious || $revision['revid'] > $this->lastRevision) {
+					$revisionsProcessed = $this->processRevision( $revision, $pageID, $title ) || $revisionsProcessed;
 				} else {
-					$this->output( sprintf( "Skipping the processRevision of revision %d minor or equal to the last revision of the database (%d).\n", $revision['revid'], $this->lastRevision ) );
+					$this->output( sprintf( "Skipping the processRevision of revision %d minor or equal to the last revision of the database (%d).\n",
+						$revision['revid'], $this->lastRevision ) );
 				}
 			}
 
@@ -629,7 +535,7 @@ class GrabNewText extends Maintenance {
 			}
 
 			$result = $this->bot->query( $params );
-			if ( ! $result || isset( $result['error'] ) ) {
+			if ( !$result || isset( $result['error'] ) ) {
 				$this->fatalError( "Error getting revision information from API for page $pageDesignation." );
 				return;
 			}
@@ -657,7 +563,7 @@ class GrabNewText extends Maintenance {
 		if ( $this->supportsCounters && $page_e['counter'] ) {
 			$insert_fields['page_counter'] = $page_e['counter'];
 		}
-		if ( ! $pageIsPresent ) {
+		if ( !$pageIsPresent ) {
 			# insert if not present
 			$this->output( "Inserting page entry $pageID\n" );
 			$insert_fields['page_id'] = $pageID;
@@ -680,267 +586,70 @@ class GrabNewText extends Maintenance {
 	}
 
 	/**
-	 * Process an individual page revision.
-	 *
-	 * @param array $revision Array retrieved from the API, containing the revision
-	 *     text, ID, timestamp, whether it was a minor edit or not and much more
-	 * @param int $page_id Page ID number of the revision we are going to insert
-	 * @param string $defaultModel Default content model for this page
-	 * @return bool Whether revision has been inserted or not
-	 */
-	function processRevision( $revision, $page_id, $defaultModel ) {
-		global $wgContLang, $wgContentHandlerUseDB;
-		$revid = $revision['revid'];
-
-		# Workaround check if it's already there.
-		$rowCount = $this->dbw->selectRowCount(
-			'revision',
-			'rev_id',
-			[ 'rev_id' => $revid ],
-			__METHOD__
-		);
-		if ( $rowCount ) {
-			# Already in database
-			$this->output( "Revision $revid is already in the database. Skipped.\n" );
-			return false;
-		}
-
-		# Sloppy handler for revdeletions; just fills them in with dummy text
-		# and sets bitfield thingy
-		$revdeleted = 0;
-		if ( isset( $revision['userhidden'] ) ) {
-			$revdeleted = $revdeleted | Revision::DELETED_USER;
-			if ( !isset( $revision['user'] ) ) {
-				$revision['user'] = ''; # username removed
-			}
-			if ( !isset( $revision['userid'] ) ) {
-				$revision['userid'] = 0;
-			}
-		}
-		if ( isset( $revision['commenthidden'] ) ) {
-			$revdeleted = $revdeleted | Revision::DELETED_COMMENT;
-			$comment = ''; # edit summary removed
-		} else {
-			$comment = $revision['comment'];
-			if ( $comment ) {
-				$comment = $wgContLang->truncateForDatabase( $comment, 255 );
-			} else {
-				$comment = '';
-			}
-		}
-		if ( isset( $revision['texthidden'] ) ) {
-			$revdeleted = $revdeleted | Revision::DELETED_TEXT;
-			$text = ''; # This content has been removed.
-		} else {
-			$text = $revision['*'];
-		}
-		if ( isset ( $revision['suppressed'] ) ) {
-			$revdeleted = $revdeleted | Revision::DELETED_RESTRICTED;
-		}
-
-		$e = [
-			'id' => $revid,
-			'page' => $page_id,
-			'comment' => $comment,
-			'user' => $revision['userid'], # May not be accurate to the new wiki, obvious, but whatever.
-			'user_text' => $revision['user'],
-			'timestamp' => wfTimestamp( TS_MW, $revision['timestamp'] ),
-			'minor_edit' => ( isset( $revision['minor'] ) ? 1 : 0 ),
-			'deleted' => $revdeleted,
-			'len' => strlen( $text ),
-			'parent_id' => $revision['parentid'],
-			# Do not attempt to get the field from api, because it's not what
-			# you'd expect. See T75411
-			'sha1' => Revision::base36Sha1( $text ),
-			'content_model' => null,
-			'content_format' => null
-		];
-
-		$e['text_id'] = $this->storeText( $text, $e['sha1'], $page_id, $revid );
-
-		# Set content model
-		if ( $wgContentHandlerUseDB && isset( $revision['contentmodel'] ) ) {
-			# Set only if not the default content model
-			if ( $defaultModel != $revision['contentmodel'] ) {
-				$e['content_model'] = $revision['contentmodel'];
-				$defaultFormat = ContentHandler::getForModelID( $defaultModel )->getDefaultFormat();
-				if ( $defaultFormat != $revision['contentformat'] ) {
-					$e['content_format'] = $revision['contentformat'];
-				}
-			}
-		}
-
-		$insert_fields = [
-			'rev_id' => $e['id'],
-			'rev_page' => $e['page'],
-			'rev_text_id' => $e['text_id'],
-			'rev_comment' => $e['comment'],
-			'rev_user' => $e['user'],
-			'rev_user_text' => $e['user_text'],
-			'rev_timestamp' => $e['timestamp'],
-			'rev_minor_edit' => $e['minor_edit'],
-			'rev_deleted' => $e['deleted'],
-			'rev_len' => $e['len'],
-			'rev_parent_id' => $e['parent_id'],
-			'rev_sha1' => $e['sha1'],
-			'rev_content_model' => $e['content_model'],
-			'rev_content_format' => $e['content_format'],
-		];
-
-		$this->output( sprintf( "Inserting revision %s\n", $e['id'] ) );
-		$this->dbw->insert(
-			'revision',
-			$insert_fields,
-			__METHOD__
-		);
-
-		# Insert tags, if any
-		if ( isset( $revision['tags'] ) && count( $revision['tags'] ) > 0 ) {
-			foreach ( $revision['tags'] as $tag ) {
-				$this->dbw->insert(
-					'change_tag',
-					[
-						'ct_rev_id' => $e['id'],
-						'ct_tag' => $tag,
-					],
-					__METHOD__
-				);
-			}
-			$this->dbw->insert(
-				'tag_summary',
-				[
-					'ts_rev_id' => $e['id'],
-					'ts_tags' => implode( ',', $revision['tags'] ),
-				],
-				__METHOD__
-			);
-		}
-
-		$this->dbw->commit();
-
-		return true;
-	}
-
-	/**
-	 * Stores revision text in the text table. If the page ID is provided and
-	 * a revision exists with the same text, it will reuse it instead of
-	 * creating a duplicate entry in text table.
-	 * If configured, stores text in external storage
-	 *
-	 * @param string $text Text of the revision to store
-	 * @param string $sha1 computed sha1 of the text
-	 * @param int $pageID page id of the revision, used to return the
-	 *            previous revision text if it's the same (optional)
-	 * @param int $revisionID revision id (optional)
-	 * @return int text id of the inserted text
-	 */
-	function storeText( $text, $sha1, $pageID = 0, $revisionID = 0 ) {
-		global $wgDefaultExternalStore;
-
-		if ( $pageID ) {
-			# Check first if the text already exists on any revision of the current page,
-			# to reuse text rows on page moves, protections, etc
-			# Return the previous revision from that page
-			$row = $this->dbw->selectRow(
-				[ 'revision' ],
-				[ 'rev_id', 'rev_sha1', 'rev_text_id' ],
-				"rev_page = $pageID AND rev_id <= $revisionID",
-				__METHOD__,
-				[
-					'LIMIT' => 1,
-					'ORDER BY' => 'rev_id DESC'
-				]
-			);
-
-			if ( $row && $row->rev_sha1 == $sha1 ) {
-				# Return the existing text id instead of creating a new one
-				return $row->rev_text_id;
-			}
-		}
-
-		$this->lastTextId++;
-
-		$flags = Revision::compressRevisionText( $text );
-
-		# Write to external storage if required
-		if ( $wgDefaultExternalStore ) {
-			# Store and get the URL
-			$text = ExternalStore::insertToDefault( $text );
-			if ( !$text ) {
-				throw new MWException( "Unable to store text to external storage" );
-			}
-			if ( $flags ) {
-				$flags .= ',';
-			}
-			$flags .= 'external';
-		}
-
-		$e = [
-			'id' => $this->lastTextId,
-			'text' => $text,
-			'flags' => $flags
-		];
-
-		$this->dbw->insert(
-			'text',
-			[
-				'old_id' => $e['id'],
-				'old_text' => $e['text'],
-				'old_flags' => $e['flags']
-			],
-			__METHOD__
-		);
-
-		return $e['id'];
-	}
-
-	/**
 	 * Copies revisions to archive and then deletes the page and revisions
 	 */
 	function archiveAndDeletePage( $pageID, $ns, $title ) {
-		$e = [
-			'ar_page_id' => $pageID,
-			'ar_namespace' => $ns,
-			'ar_title' => $title
-		];
+		global $wgActorTableSchemaMigrationStage, $wgContentHandlerUseDB;
 
 		# Get and insert revision data
+		# Most of this stuff comes from WikiPage::archiveRevisions()
+		$revQuery = $this->revisionStore->getQueryInfo();
+
+		if ( $wgActorTableSchemaMigrationStage & SCHEMA_COMPAT_WRITE_OLD ) {
+			$revQuery['fields'][] = 'rev_text_id';
+
+			if ( $wgContentHandlerUseDB ) {
+				$revQuery['fields'][] = 'rev_content_model';
+				$revQuery['fields'][] = 'rev_content_format';
+			}
+		}
 		$result = $this->dbw->select(
-			'revision',
-			[
-				'rev_comment',
-				'rev_user',
-				'rev_user_text',
-				'rev_timestamp',
-				'rev_minor_edit',
-				'rev_id',
-				'rev_text_id',
-				'rev_deleted',
-				'rev_len',
-				'rev_parent_id',
-				'rev_sha1',
-				'rev_content_model',
-				'rev_content_format'
-			],
+			$revQuery['tables'],
+			$revQuery['fields'],
 			[ 'rev_page' => $pageID ],
-			__METHOD__
+			__METHOD__,
+			[],
+			$revQuery['joins']
 		);
+
+		$commentStore = CommentStore::getStore();
+		$actorMigration = ActorMigration::newMigration();
+		$revids = [];
+
 		foreach ( $result as $row ) {
-			$e['ar_comment'] = $row->rev_comment;
-			$e['ar_user'] = $row->rev_user;
-			$e['ar_user_text'] = $row->rev_user_text;
+			$e = [
+				'ar_page_id' => $pageID,
+				'ar_namespace' => $ns,
+				'ar_title' => $title
+			];
+			#$e['ar_comment'] = $row->rev_comment;
+			#$e['ar_user'] = $row->rev_user;
+			#$e['ar_user_text'] = $row->rev_user_text;
 			$e['ar_timestamp'] = $row->rev_timestamp;
 			$e['ar_minor_edit'] = $row->rev_minor_edit;
 			$e['ar_rev_id'] = $row->rev_id;
-			$e['ar_text_id'] = $row->rev_text_id;
+			#$e['ar_text_id'] = $row->rev_text_id;
 			$e['ar_deleted'] = $row->rev_deleted;
 			$e['ar_len'] = $row->rev_len;
 			$e['ar_parent_id'] = $row->rev_parent_id;
 			$e['ar_sha1'] = $row->rev_sha1;
-			$e['ar_content_model'] = $row->rev_content_model;
-			$e['ar_content_format'] = $row->rev_content_format;
+			#$e['ar_content_model'] = $row->rev_content_model;
+			#$e['ar_content_format'] = $row->rev_content_format;
+			if ( $wgActorTableSchemaMigrationStage & SCHEMA_COMPAT_WRITE_OLD ) {
+				$e['ar_text_id'] = $row->rev_text_id;
+
+				if ( $wgContentHandlerUseDB ) {
+					$e['ar_content_model'] = $row->rev_content_model;
+					$e['ar_content_format'] = $row->rev_content_format;
+				}
+			}
+			$comment = $commentStore->getComment( 'rev_comment', $row );
+			$user = User::newFromAnyId( $row->rev_user, $row->rev_user_text, $row->rev_actor );
+			$e += $commentStore->insert( $this->dbw, 'ar_comment', $comment );
+			$e += $actorMigration->getInsertValues( $this->dbw, 'ar_user', $user );
 
 			$this->dbw->insert( 'archive', $e, __METHOD__ );
+			$revids[] = $row->rev_id;
 		}
 
 		# Delete page and revision entries
@@ -954,6 +663,18 @@ class GrabNewText extends Maintenance {
 			[ 'rev_page' => $pageID ],
 			__METHOD__
 		);
+		$this->dbw->delete(
+			'revision_comment_temp',
+			[ 'revcomment_rev' => $revids ],
+			__METHOD__
+		);
+		if ( $wgActorTableSchemaMigrationStage & SCHEMA_COMPAT_WRITE_NEW ) {
+			$this->dbw->delete(
+				'revision_actor_temp',
+				[ 'revactor_rev' => $revids ],
+				__METHOD__
+			);
+		}
 		# Also delete any restrictions
 		$this->dbw->delete(
 			'page_restrictions',
@@ -964,7 +685,33 @@ class GrabNewText extends Maintenance {
 	}
 
 	function updateRestored( $ns, $title ) {
-		# Get a reference of the archived revisions text id's we're going to delete
+		global $wgMultiContentRevisionSchemaMigrationStage;
+
+		if ( $wgMultiContentRevisionSchemaMigrationStage & SCHEMA_COMPAT_WRITE_NEW ) {
+			# We need to delete content from the slots table too, otherwise
+			# when we get the revisions from the remote wiki that already
+			# exist here, we'll get duplicate errors
+			$result = $this->dbw->select(
+				'archive',
+				[ 'ar_rev_id' ],
+				[
+					'ar_title' => $title,
+					'ar_namespace' => $ns
+				],
+				__METHOD__
+			);
+			$revids = [];
+			foreach ( $result as $row ) {
+				$revids[] = $row->ar_rev_id;
+			}
+			if ( $revids ) {
+				$this->dbw->delete(
+					'slots',
+					[ 'slot_revision_id' => $revids ],
+					__METHOD__
+				);
+			}
+		}
 		# Delete existing deleted revisions for page
 		$this->dbw->delete(
 			'archive',
@@ -986,11 +733,13 @@ class GrabNewText extends Maintenance {
 	 **/
 	function updateDeletedRevs( $ns, $title ) {
 		$pageTitle = Title::makeTitle( $ns, $title );
-		if ( ! $this->canSeeDeletedRevs ) {
+		if ( !$this->canSeeDeletedRevs ) {
 			$this->output( "Unable to see deleted revisions for title $pageTitle\n" );
 			return;
 		}
 
+		# TODO: list=deletedrevs is deprecated in recent MediaWiki versions.
+		# should try to use list=alldeletedrevisions first and fallback to deletedrevs
 		$params = [
 			'list' => 'deletedrevs',
 			'titles' => (string)$pageTitle,
@@ -1001,7 +750,7 @@ class GrabNewText extends Maintenance {
 
 		$result = $this->bot->query( $params );
 
-		if ( ! $result || isset( $result['error'] ) ) {
+		if ( !$result || isset( $result['error'] ) ) {
 			if ( isset( $result['error'] ) && $result['error']['code'] == 'drpermissiondenied' ) {
 				$this->output( "Warning: Current user can't see deleted revisions.\n" .
 					"Unable to see deleted revisions for title $pageTitle\n" );
@@ -1021,7 +770,23 @@ class GrabNewText extends Maintenance {
 
 		while ( true ) {
 			foreach ( $info_deleted['revisions'] as $revision ) {
-				$this->processDeletedRevision( $revision, $ns, $title );
+				$revisionId = $revision['revid'];
+				if ( !$revisionId ) {
+					# Revision ID is mandatory with the new content tables and things will fail if not provided.
+					$this->output( sprintf( "WARNING: Got revision without revision id, " .
+						"with timestamp %s. Skipping!\n", $revision['timestamp'] ) );
+					continue;
+				}
+				# Check if archived revision is already there to prevent duplicate entries
+				$count = $this->dbw->selectRowCount(
+					'archive',
+					'1',
+					[ 'ar_rev_id' => $revisionId ],
+					__METHOD__
+				);
+				if ( !$count ) {
+					$this->insertArchivedRevision( $revision, $pageTitle );
+				}
 			}
 
 			if ( isset( $result['query-continue'] ) && isset( $result['query-continue']['deletedrevs'] ) ) {
@@ -1032,7 +797,7 @@ class GrabNewText extends Maintenance {
 			}
 
 			$result = $this->bot->query( $params );
-			if ( ! $result || isset( $result['error'] ) ) {
+			if ( !$result || isset( $result['error'] ) ) {
 				$this->fatalError( "Error getting deleted revision information from API for page $pageTitle." );
 				return;
 			}
@@ -1041,138 +806,9 @@ class GrabNewText extends Maintenance {
 		}
 	}
 
-	/**
-	 * Insert a given deleted revision obtained from an api requested
-	 * to the database.
-	 * Checks if revision already exists on archive
-	 *
-	 * @param array $revision array retrieved from the API, containing the revision
-	 *     text, ID, timestamp, whether it was a minor edit or not and much more
-	 * @param int $ns Namespace number of the deleted revision
-	 * @param string $title Title of the deleted revision
-	 */
-	function processDeletedRevision( $revision, $ns, $title ) {
-		global $wgContLang;
-
-		# Check if archived revision is already there to prevent duplicate entries
-		if ( $revision['revid'] ) {
-			$count = $this->dbw->selectRowCount(
-				'archive',
-				'1',
-				[ 'ar_rev_id' => $revision['revid'] ],
-				__METHOD__
-			);
-			if ( $count > 0 ) {
-				return;
-			}
-		}
-
-		# Sloppy handler for revdeletions; just fills them in with dummy text
-		# and sets bitfield thingy
-		$revdeleted = 0;
-		if ( isset( $revision['userhidden'] ) ) {
-			$revdeleted = $revdeleted | Revision::DELETED_USER;
-			if ( !isset( $revision['user'] ) ) {
-				$revision['user'] = ''; # username removed
-			}
-			if ( !isset( $revision['userid'] ) ) {
-				$revision['userid'] = 0;
-			}
-		}
-		if ( isset( $revision['commenthidden'] ) ) {
-			$revdeleted = $revdeleted | Revision::DELETED_COMMENT;
-			$comment = ''; # edit summary removed
-		} else {
-			$comment = $revision['comment'];
-			if ( $comment ) {
-				$comment = $wgContLang->truncateForDatabase( $comment, 255 );
-			} else {
-				$comment = '';
-			}
-		}
-		if ( isset( $revision['texthidden'] ) ) {
-			$revdeleted = $revdeleted | Revision::DELETED_TEXT;
-			$text = ''; # This content has been removed.
-		} else {
-			$text = $revision['*'];
-		}
-		if ( isset ( $revision['suppressed'] ) ) {
-			$revdeleted = $revdeleted | Revision::DELETED_RESTRICTED;
-		}
-
-		$e = [
-			'ns' => $ns,
-			'title' => $title,
-			'id' => $revision['revid'],
-			'comment' => $comment,
-			'user' => $revision['userid'], # May not be accurate to the new wiki, obvious, but whatever.
-			'user_text' => $revision['user'],
-			'timestamp' => wfTimestamp( TS_MW, $revision['timestamp'] ),
-			'minor_edit' => ( isset( $revision['minor'] ) ? 1 : 0 ),
-			'deleted' => $revdeleted,
-			'len' => strlen( $text ),
-			'parent_id' => $revision['parentid'],
-			'sha1' => Revision::base36Sha1( $text ),
-			'content_model' => null, # Content handler not available for deleted revisions
-			'content_format' => null
-		];
-
-		$e['text_id'] = $this->storeText( $text, $e['sha1'] );
-
-		$insert_fields = [
-			'ar_namespace' => $ns,
-			'ar_title' => $title,
-			'ar_rev_id' => $e['id'],
-			'ar_comment' => $e['comment'],
-			'ar_user' => $e['user'],
-			'ar_user_text' => $e['user_text'],
-			'ar_timestamp' => $e['timestamp'],
-			'ar_minor_edit' => $e['minor_edit'],
-			'ar_text_id' => $e['text_id'],
-			'ar_deleted' => $e['deleted'],
-			'ar_len' => $e['len'],
-			#'ar_page_id' => NULL, # Not requred and unreliable from api
-			'ar_parent_id' => $e['parent_id'],
-			'ar_sha1' => $e['sha1'],
-			'ar_content_model' => $e['content_model'],
-			'ar_content_format' => $e['content_format']
-		];
-
-		$this->output( sprintf( "Inserting deleted revision %s\n", $e['id'] ) );
-		$this->dbw->insert(
-			'archive',
-			$insert_fields,
-			__METHOD__
-		);
-
-		# Insert tags, if any
-		if ( isset( $revision['tags'] ) && count( $revision['tags'] ) > 0 ) {
-			foreach ( $revision['tags'] as $tag ) {
-				$this->dbw->insert(
-					'change_tag',
-					[
-						'ct_rev_id' => $e['id'],
-						'ct_tag' => $tag,
-					],
-					__METHOD__
-				);
-			}
-			$this->dbw->insert(
-				'tag_summary',
-				[
-					'ts_rev_id' => $e['id'],
-					'ts_tags' => implode( ',', $revision['tags'] ),
-				],
-				__METHOD__
-			);
-		}
-
-		$this->dbw->commit();
-	}
-
 	function processMove( $ns, $title ) {
 		$sourceTitle = Title::makeTitle( $ns, $title );
-		if ( ! in_array( (string)$sourceTitle, $this->movedTitles ) ) {
+		if ( !in_array( (string)$sourceTitle, $this->movedTitles ) ) {
 			$this->movedTitles[] = (string)$sourceTitle;
 		}
 		$this->output( "Check whether $sourceTitle refers to the same page on both wikis...\n" );
@@ -1186,7 +822,7 @@ class GrabNewText extends Maintenance {
 			];
 			$result = $this->bot->query( $params );
 
-			if ( ! $result || isset( $result['error'] ) ) {
+			if ( !$result || isset( $result['error'] ) ) {
 				$this->fatalError( "Error getting information from API for page ID $pageID" );
 				return;
 			}
@@ -1234,7 +870,7 @@ class GrabNewText extends Maintenance {
 				];
 				# Need to process also old revisions in case there were page restores
 				$this->processPage( $pageInfo, null, false );
-				if ( ! in_array( $pageID, $this->pagesProcessed ) ) {
+				if ( !in_array( $pageID, $this->pagesProcessed ) ) {
 					$this->pagesProcessed[] = $pageID;
 				}
 			}
@@ -1258,7 +894,7 @@ class GrabNewText extends Maintenance {
 			];
 			$result = $this->bot->query( $params );
 
-			if ( ! $result || isset( $result['error'] ) ) {
+			if ( !$result || isset( $result['error'] ) ) {
 				$this->fatalError( "Error getting information from API for page $sourceTitle" );
 				return;
 			}
@@ -1308,148 +944,10 @@ class GrabNewText extends Maintenance {
 			];
 			# Need to process also old revisions in case there were page restores
 			$this->processPage( $pageInfo, null, false );
-			if ( ! in_array( $remoteID, $this->pagesProcessed ) ) {
+			if ( !in_array( $remoteID, $this->pagesProcessed ) ) {
 				$this->pagesProcessed[] = $remoteID;
 			}
 		}
-	}
-
-	/**
-	 * Fixes a situation where we have the same title on local and remote wiki
-	 * but with different page ID. The fix is to get the title for the local
-	 * page ID on the remote wiki.
-	 * If local page id doesn't exist on remote, delete (and archive) local page
-	 * since it must have been deleted. If it exists (in this case with different
-	 * title) then move it to where it belongs
-	 *
-	 * @param int $conflictingPageID page ID with different title on local
-	 *     and remote wiki
-	 * @param int $remoteNs Namespace number of remote title for page id
-	 * @param string $remoteTitle remote title for page id
-	 * @param int $initialConflict optional - original conflicting ID to avoid
-	 *     endless loops if pages were moved in round
-	 * @return object A page object retrieved from database if an endless loop is
-	 *     detected, used internally on recursive calls
-	 */
-	function resolveConflictingTitle( $conflictingPageID, $remoteNs, $remoteTitle, $initialConflict = 0 ) {
-		$pageObj = null;
-		$pageTitle = Title::makeTitle( $remoteNs, $remoteTitle );
-		$this->output( "Warning: remote page ID $conflictingPageID has conflicting title $pageTitle with existing local page ID $conflictingPageID. Attempting to fix it...\n" );
-		if ( ! in_array( (string)$pageTitle, $this->movedTitles ) ) {
-			$this->movedTitles[] = (string)$pageTitle;
-		}
-
-		# Get current title of the existing local page ID and move it to where it belongs
-		$params = [
-			'prop' => 'info',
-			'pageids' => $conflictingPageID
-		];
-		$result = $this->bot->query( $params );
-		$info_pages = array_values( $result['query']['pages'] );
-
-		# First call to resolveConflictingTitle won't enter here, but on further recursive calls
-		if ( isset( $info_pages[0]['missing'] ) ) {
-			$this->output( "Page ID $conflictingPageID not found on remote wiki. Deleting...\n" );
-			# Delete our copy, move revisions to archive
-			# NOTE: If page was moved on remote wiki before deleting, we may potentially
-			# leave revisions in archive with wrong title.
-			$this->archiveAndDeletePage( $conflictingPageID, $remoteNs, $remoteTitle );
-		} else {
-			# Move page, but check first that the target title doesn't exist on local to avoid a conflict
-			$resultingNs = $info_pages[0]['ns'];
-			$resultingTitle = $this->sanitiseTitle( $info_pages[0]['ns'], $info_pages[0]['title'] );
-			$resultingPageID = $this->getPageID( $resultingNs, $resultingTitle );
-			$resultingPageTitle = Title::makeTitle( $resultingNs, $resultingTitle );
-			if ( ! in_array( (string)$resultingPageTitle, $this->movedTitles ) ) {
-				$this->movedTitles[] = (string)$resultingPageTitle;
-			}
-
-			if ( $resultingPageID ) {
-
-				if ( $initialConflict == $resultingPageID ) {
-					# This should never happen, unless we move A->B, C->A, B->C
-					# In this case, we can't just rename, because it will blatantly violate the unique key for title
-					# Get the page information, delete it from DB and restore it after the move
-					$this->output( "Endless loop detected! Storing page ID $resultingPageID for later restore.\n" );
-					$pageObj = (array)$this->dbw->selectRow(
-						'page',
-						'*',
-						[ 'page_id' => $resultingPageID ],
-						__METHOD__
-					);
-					$this->dbw->delete(
-						'page',
-						[ 'page_id' => $resultingPageID ],
-						__METHOD__
-					);
-				} else {
-					# Whoops! resulting title already exists locally, here we go again...
-					$pageObj = $this->resolveConflictingTitle( $resultingPageID, $resultingNs, $resultingTitle, $conflictingPageID );
-				}
-
-				if ( $pageObj && $initialConflict === 0 ) {
-					# Once we're resolved all conflicts, if we returend a $pageObj and we're on the originall call,
-					# restore the deleted page entry, with the correct page ID.
-					$this->output( sprintf( "Restoring page ID %s at title %s.\n",
-						$pageObj['page_id'], $resultingPageTitle ) );
-					$pageObj['page_namespace'] = $resultingNs;
-					$pageObj['page_title'] = $resultingTitle;
-					$this->dbw->insert(
-						'page',
-						$pageObj,
-						__METHOD__
-					);
-					# We've restored the page fixing the title, nothing more to do!
-					return null;
-				}
-
-			}
-			$this->output( "Moving page ID $conflictingPageID to $resultingPageTitle...\n" );
-			$this->dbw->update(
-				'page',
-				[
-					'page_namespace' => $resultingNs,
-					'page_title' => $resultingTitle,
-				],
-				[ 'page_id' => $conflictingPageID ],
-				__METHOD__
-			);
-		}
-		return $pageObj;
-	}
-
-	/**
-	 * For use with deleted crap that chucks the id; spotty at best.
-	 *
-	 * @param int $ns Namespace number
-	 * @param string $title Title of the page without the namespace
-	 */
-	function getPageID( $ns, $title ) {
-		$pageID = (int)$this->dbw->selectField(
-			'page',
-			'page_id',
-			[
-				'page_namespace' => $ns,
-				'page_title' => $title,
-			],
-			__METHOD__
-		);
-		return $pageID;
-	}
-
-	/**
-	 * Strips the namespace from the title, if namespace number is different than 0,
-	 *  and converts spaces to underscores. For use in database
-	 *
-	 * @param int $ns Namespace number
-	 * @param string $title Title of the page with the namespace
-	 */
-	function sanitiseTitle( $ns, $title ) {
-		if ( $ns != 0 ) {
-			$title = preg_replace( '/^[^:]*?:/', '', $title );
-		}
-		$title = str_replace( ' ', '_', $title );
-		return $title;
 	}
 }
 

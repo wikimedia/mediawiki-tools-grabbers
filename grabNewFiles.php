@@ -6,8 +6,8 @@
  * @file
  * @ingroup Maintenance
  * @author Jesús Martínez <martineznovo@gmail.com>
- * @date 24 June 2017
- * @version 0.1
+ * @date 5 August 2019
+ * @version 1.0
  * @note Based on code by Calimonious the Estrange, Misza, Jack Phoenix and Edward Chernenko.
  */
 
@@ -47,8 +47,8 @@ class GrabNewFiles extends FileGrabber {
 	public function __construct() {
 		parent::__construct();
 		$this->mDescription = "Grabs updates to files from an external wiki\nFor use when files have been imported already and want to keep track of new uploads.";
-		$this->addOption( 'startdate', 'Start point (20121222142317, 2012-12-22T14:23:17T, etc); note that this cannot go back further than 1-3 months on most projects.', true /* required? */, true /* withArg */ );
-		$this->addOption( 'enddate', 'Date after which to ignore new files (20121222142317, 2012-12-22T14:23:17T, etc); note that the process may fail to process existing files that have been moved after this date', false, true );
+		$this->addOption( 'startdate', 'Start point (20121222142317, 2012-12-22T14:23:17Z, etc); note that this cannot go back further than 1-3 months on most projects.', true /* required? */, true /* withArg */ );
+		$this->addOption( 'enddate', 'Date after which to ignore new files (20121222142317, 2012-12-22T14:23:17Z, etc); note that the process may fail to process existing files that have been moved after this date', false, true );
 	}
 
 	public function execute() {
@@ -262,26 +262,40 @@ class GrabNewFiles extends FileGrabber {
 	 * @return bool Whether succeeded or not
 	 */
 	function moveToOldFile( $name, $oldArchiveName, $oldTimestamp ) {
+		global $wgActorTableSchemaMigrationStage;
+
 		$this->output( "Moving current file $name to archive $oldArchiveName\n" );
+
+		$fields = [
+			'oi_name' => 'img_name',
+			'oi_archive_name' => $this->dbw->addQuotes( $oldArchiveName ),
+			'oi_size' => 'img_size',
+			'oi_width' => 'img_width',
+			'oi_height' => 'img_height',
+			'oi_bits' => 'img_bits',
+			'oi_timestamp' => 'img_timestamp',
+			#'oi_description' => 'img_description',
+			#'oi_user' => 'img_user',
+			#'oi_user_text' => 'img_user_text',
+			'oi_metadata' => 'img_metadata',
+			'oi_media_type' => 'img_media_type',
+			'oi_major_mime' => 'img_major_mime',
+			'oi_minor_mime' => 'img_minor_mime',
+			'oi_sha1' => 'img_sha1'
+		];
+
+		# This is from LocalFile::recordUpload2()
+		if ( $wgActorTableSchemaMigrationStage & SCHEMA_COMPAT_WRITE_OLD ) {
+			$fields['oi_user'] = 'img_user';
+			$fields['oi_user_text'] = 'img_user_text';
+		}
+		if ( $wgActorTableSchemaMigrationStage & SCHEMA_COMPAT_WRITE_NEW ) {
+			$fields['oi_actor'] = 'img_actor';
+		}
+
 		$this->dbw->begin();
 		$this->dbw->insertSelect( 'oldimage', 'image',
-			[
-				'oi_name' => 'img_name',
-				'oi_archive_name' => $this->dbw->addQuotes( $oldArchiveName ),
-				'oi_size' => 'img_size',
-				'oi_width' => 'img_width',
-				'oi_height' => 'img_height',
-				'oi_bits' => 'img_bits',
-				'oi_timestamp' => 'img_timestamp',
-				'oi_description' => 'img_description',
-				'oi_user' => 'img_user',
-				'oi_user_text' => 'img_user_text',
-				'oi_metadata' => 'img_metadata',
-				'oi_media_type' => 'img_media_type',
-				'oi_major_mime' => 'img_major_mime',
-				'oi_minor_mime' => 'img_minor_mime',
-				'oi_sha1' => 'img_sha1'
-			],
+			$fields,
 			[ 'img_name' => $name ],
 			__METHOD__
 		);

@@ -5,27 +5,12 @@
  * @file
  * @ingroup Maintenance
  * @author Kunal Mehta <legoktm@gmail.com>
- * @version 1.0
+ * @version 1.1
  */
 
-require_once __DIR__ . '/../maintenance/Maintenance.php';
-require_once 'includes/mediawikibot.class.php';
+require_once 'includes/ExternalWikiGrabber.php';
 
-class GrabUserGroups extends Maintenance {
-
-	/**
-	 * Handle to the database connection
-	 *
-	 * @var DatabaseBase
-	 */
-	protected $dbw;
-
-	/**
-	 * MediaWikiBot instance
-	 *
-	 * @var MediaWikiBot
-	 */
-	protected $bot;
+class GrabUserGroups extends ExternalWikiGrabber {
 
 	/**
 	 * Groups we don't want to import...
@@ -46,51 +31,16 @@ class GrabUserGroups extends Maintenance {
 	public function __construct() {
 		parent::__construct();
 		$this->mDescription = 'Grabs user group assignments from a pre-existing wiki into a new wiki.';
-		$this->addOption( 'url', 'URL to the target wiki\'s api.php', true /* required? */, true /* withArg */, 'u' );
-		$this->addOption( 'username', 'Username to log into the target wiki', false, true, 'n' );
-		$this->addOption( 'password', 'Password on the target wiki', false, true, 'p' );
 		$this->addOption( 'groups', 'Get only a specific list of groups (pipe separated list of group names, by default everything except *, user and autoconfirmed)', false, true );
-		$this->addOption( 'db', 'Database name, if we don\'t want to write to $wgDBname', false, true );
 		$this->addOption( 'wikia', 'Set this param if the target wiki is on Wikia, which uses a different API', false, false );
 	}
 
 	public function execute() {
-		global $wgDBname;
-		$url = $this->getOption( 'url' );
-		if ( !$url ) {
-			$this->fatalError( 'The URL to the target wiki\'s api.php is required!' );
-		}
-		$user = $this->getOption( 'username' );
-		$password = $this->getOption( 'password' );
+		parent::execute();
+
 		$providedGroups = $this->getOption( 'groups' );
 		if ( $providedGroups ) {
 			$this->groups = explode( '|', $providedGroups );
-		}
-		# Get a single DB_MASTER connection
-		$this->dbw = wfGetDB( DB_MASTER, [], $this->getOption( 'db', $wgDBname ) );
-
-		# bot class and log in if requested
-		if ( $user && $password ) {
-			$this->bot = new MediaWikiBot(
-				$url,
-				'json',
-				$user,
-				$password,
-				'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:13.0) Gecko/20100101 Firefox/13.0.1'
-			);
-			if ( !$this->bot->login() ) {
-				$this->output( "Logged in as $user...\n" );
-			} else {
-				$this->fatalError( "Failed to log in as $user." );
-			}
-		} else {
-			$this->bot = new MediaWikiBot(
-				$url,
-				'json',
-				'',
-				'',
-				'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:13.0) Gecko/20100101 Firefox/13.0.1'
-			);
 		}
 
 		$this->output( "Getting user group information.\n" );

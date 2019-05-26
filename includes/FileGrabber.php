@@ -5,15 +5,16 @@
  * @file
  * @ingroup Maintenance
  * @author Jesús Martínez <martineznovo@gmail.com>
- * @date 24 June 2017
- * @version 1.0
+ * @date 5 August 2019
+ * @version 1.1
  * @note Based on code by Calimonious the Estrange, Misza, Jack Phoenix and Edward Chernenko.
  */
 
-require_once __DIR__ . '/../../maintenance/Maintenance.php';
-require_once 'mediawikibot.class.php';
+use MediaWiki\MediaWikiServices;
 
-abstract class FileGrabber extends Maintenance {
+require_once 'ExternalWikiGrabber.php';
+
+abstract class FileGrabber extends ExternalWikiGrabber {
 
 	/**
 	 * End date
@@ -21,20 +22,6 @@ abstract class FileGrabber extends Maintenance {
 	 * @var string
 	 */
 	protected $endDate;
-
-	/**
-	 * Handle to the database connection
-	 *
-	 * @var DatabaseBase
-	 */
-	protected $dbw;
-
-	/**
-	 * MediaWikiBot instance
-	 *
-	 * @var MediaWikiBot
-	 */
-	protected $bot;
 
 	/**
 	 * Local file repository
@@ -59,10 +46,6 @@ abstract class FileGrabber extends Maintenance {
 
 	public function __construct() {
 		parent::__construct();
-		$this->addOption( 'url', 'URL to the target wiki\'s api.php', true /* required? */, true /* withArg */, 'u' );
-		$this->addOption( 'username', 'Username to log into the target wiki', false, true, 'n' );
-		$this->addOption( 'password', 'Password on the target wiki', false, true, 'p' );
-		$this->addOption( 'db', 'Database name, if we don\'t want to write to $wgDBname', false, true );
 		$this->addOption( 'wikia', 'Set this param if the target wiki is on Wikia, which needs to handle URLs in a special way', false, false );
 	}
 
@@ -120,8 +103,6 @@ abstract class FileGrabber extends Maintenance {
 	 * @return Status Status of the file operation
 	 */
 	function newUpload( $name, $fileVersion ) {
-		global $wgContLang;
-
 		$this->output( "Uploading $name..." );
 		if ( !isset( $fileVersion['url'] ) ) {
 			# If the file is supressed and we don't have permissions,
@@ -134,9 +115,7 @@ abstract class FileGrabber extends Maintenance {
 		$fileurl = $this->sanitiseUrl( $fileVersion['url'] );
 
 		$comment = $fileVersion['comment'];
-		if ( $comment ) {
-			$comment = $wgContLang->truncateForDatabase( $comment, 255 );
-		} else {
+		if ( !$comment ) {
 			$comment = '';
 		}
 
@@ -161,6 +140,13 @@ abstract class FileGrabber extends Maintenance {
 		$file_e['major_mime'] = substr( $mime, 0, $mimeBreak );
 		$file_e['minor_mime'] = substr( $mime, $mimeBreak + 1 );
 
+		$performer = User::newFromIdentity( $this->getUserIdentity( (int)$file_e['user'], $file_e['user_text'] ) );
+
+		$commentStore = MediaWikiServices::getInstance()->getCommentStore();
+		$commentFields = $commentStore->insert( $this->dbw, 'img_description', $comment );
+		$actorMigration = ActorMigration::newMigration();
+		$actorFields = $actorMigration->getInsertValues( $this->dbw, 'img_user', $performer );
+
 		# Current version
 		$e = [
 			'img_name' => $name,
@@ -168,16 +154,16 @@ abstract class FileGrabber extends Maintenance {
 			'img_width' => $file_e['width'],
 			'img_height' => $file_e['height'],
 			'img_bits' => $file_e['bits'],
-			'img_description' => $file_e['description'],
-			'img_user' => $file_e['user'],
-			'img_user_text' => $file_e['user_text'],
+			#'img_description' => $file_e['description'],
+			#'img_user' => $file_e['user'],
+			#'img_user_text' => $file_e['user_text'],
 			'img_timestamp' => $file_e['timestamp'],
 			'img_media_type' => $file_e['media_type'],
 			'img_sha1' => $file_e['sha1'],
 			'img_metadata' => $file_e['metadata'],
 			'img_major_mime' => $file_e['major_mime'],
 			'img_minor_mime' => $file_e['minor_mime']
-		];
+		] + $commentFields + $actorFields;
 		$this->dbw->insert( 'image', $e, __METHOD__ );
 		$status = $this->storeFileFromURL( $name, $fileurl, false );
 		$this->output( "Done\n" );
@@ -193,8 +179,6 @@ abstract class FileGrabber extends Maintenance {
 	 * @return Status Status of the file operation
 	 */
 	function oldUpload( $name, $fileVersion ) {
-		global $wgContLang;
-
 		$this->output( "Uploading $name version {$fileVersion['timestamp']}..." );
 		if ( !isset( $fileVersion['url'] ) ) {
 			# If the file is supressed and we don't have permissions,
@@ -222,9 +206,7 @@ abstract class FileGrabber extends Maintenance {
 			$comment = ''; # edit summary removed
 		} else {
 			$comment = $fileVersion['comment'];
-			if ( $comment ) {
-				$comment = $wgContLang->truncateForDatabase( $comment, 255 );
-			} else {
+			if ( !$comment ) {
 				$comment = '';
 			}
 		}
@@ -258,6 +240,13 @@ abstract class FileGrabber extends Maintenance {
 		$file_e['major_mime'] = substr( $mime, 0, $mimeBreak );
 		$file_e['minor_mime'] = substr( $mime, $mimeBreak + 1 );
 
+		$performer = User::newFromIdentity( $this->getUserIdentity( (int)$file_e['user'], $file_e['user_text'] ) );
+
+		$commentStore = MediaWikiServices::getInstance()->getCommentStore();
+		$commentFields = $commentStore->insert( $this->dbw, 'oi_description', $comment );
+		$actorMigration = ActorMigration::newMigration();
+		$actorFields = $actorMigration->getInsertValues( $this->dbw, 'img_user', $performer );
+
 		# Old version
 		$e = [
 			'oi_name' => $name,
@@ -266,9 +255,9 @@ abstract class FileGrabber extends Maintenance {
 			'oi_width' => $file_e['width'],
 			'oi_height' => $file_e['height'],
 			'oi_bits' => $file_e['bits'],
-			'oi_description' => $file_e['description'],
-			'oi_user' => $file_e['user'],
-			'oi_user_text' => $file_e['user_text'],
+			#'oi_description' => $file_e['description'],
+			#'oi_user' => $file_e['user'],
+			#'oi_user_text' => $file_e['user_text'],
 			'oi_timestamp' => $file_e['timestamp'],
 			'oi_media_type' => $file_e['media_type'],
 			'oi_deleted' => $file_e['deleted'],
@@ -276,7 +265,7 @@ abstract class FileGrabber extends Maintenance {
 			'oi_metadata' => $file_e['metadata'],
 			'oi_major_mime' => $file_e['major_mime'],
 			'oi_minor_mime' => $file_e['minor_mime']
-		];
+		] + $commentFields + $actorFields;
 		$this->dbw->insert( 'oldimage', $e, __METHOD__ );
 		$status = $this->storeFileFromURL( $name, $fileurl, $file_e['timestamp'] );
 		$this->output( "Done\n" );
@@ -446,20 +435,5 @@ abstract class FileGrabber extends Maintenance {
 			}
 		}
 		return $fileurl;
-	}
-
-	/**
-	 * Strips the namespace from the title, if namespace number is different than 0,
-	 *  and converts spaces to underscores. For use in database
-	 *
-	 * @param int $ns Namespace number
-	 * @param string $title Title of the page with the namespace
-	 */
-	function sanitiseTitle( $ns, $title ) {
-		if ( $ns != 0 ) {
-			$title = preg_replace( '/^[^:]*?:/', '', $title );
-		}
-		$title = str_replace( ' ', '_', $title );
-		return $title;
 	}
 }

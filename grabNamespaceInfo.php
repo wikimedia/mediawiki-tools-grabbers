@@ -6,52 +6,29 @@
  * @ingroup Maintenance
  * @author Jack Phoenix <jack@shoutwiki.com>
  * @author Calimonious the Estrange
- * @version 1.0
- * @date 1 January 2013
+ * @version 1.1
+ * @date 5 August 2019
  */
 
-require_once __DIR__ . '/../maintenance/Maintenance.php';
-require_once 'includes/mediawikibot.class.php';
+require_once 'includes/ExternalWikiGrabber.php';
 
-class GrabNamespaceInfo extends Maintenance {
+# Custom namespaces - make a list as these will need to be added to the localsettings/whatever
+class GrabNamespaceInfo extends ExternalWikiGrabber {
 	public function __construct() {
 		parent::__construct();
 		$this->mDescription = "Get namespace info from a source wiki to add to your LocalSettings.php";
-		$this->addOption( 'url', 'URL to the target wiki\'s api.php', true /* required? */, true /* withArg */, 'u' );
 	}
 
 	public function execute() {
-		global $bot;
-
-		$url = $this->getOption( 'url' );
-		if ( !$url ) {
-			$this->fatalError( 'The URL to the source wiki\'s api.php must be specified!' );
-		}
-
-		# bot class
-		$bot = new MediaWikiBot(
-			$url,
-			'json',
-			'',
-			'',
-			'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:13.0) Gecko/20100101 Firefox/13.0.1'
-		);
+		parent::execute();
 
 		$this->output( "\n" );
-		$this->parseNamespaces();
-
-		# Done.
-	}
-
-	# Custom namespaces - make a list as these will need to be added to the localsettings/whatever
-	function parseNamespaces() {
-		global $bot;
 
 		$params = [
 			'meta' => 'siteinfo',
 			'siprop' => 'namespaces|namespacealiases'
 		];
-		$result = $bot->query( $params );
+		$result = $this->bot->query( $params );
 		if ( !$result['query'] ) {
 			$this->fatalError( 'Got no namespaces...' );
 		}

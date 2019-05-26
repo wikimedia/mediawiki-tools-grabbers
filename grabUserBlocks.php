@@ -7,51 +7,28 @@
  * @ingroup Maintenance
  * @author Jack Phoenix
  * @author Jesús Martínez <martineznovo@gmail.com>
- * @version 1.0
- * @date 28 July 2013
+ * @version 1.1
+ * @date 5 August 2019
  * @note Based on code by:
  * - Legoktm & Uncyclopedia development team, 2013 (blocks_table.py)
  */
 
-require_once __DIR__ . '/../maintenance/Maintenance.php';
-require_once 'includes/mediawikibot.class.php';
+use MediaWiki\MediaWikiServices;
 
-class GrabUserBlocks extends Maintenance {
+require_once 'includes/ExternalWikiGrabber.php';
 
-	/**
-	 * Handle to the database connection
-	 *
-	 * @var DatabaseBase
-	 */
-	protected $dbw;
-
-	/**
-	 * MediaWikiBot instance
-	 *
-	 * @var MediaWikiBot
-	 */
-	protected $bot;
+class GrabUserBlocks extends ExternalWikiGrabber {
 
 	public function __construct() {
 		parent::__construct();
 		$this->mDescription = 'Grabs user block data from a pre-existing wiki into a new wiki.';
-		$this->addOption( 'url', 'URL to the target wiki\'s api.php', true /* required? */, true /* withArg */, 'u' );
-		$this->addOption( 'username', 'Username to log into the target wiki', false, true, 'n' );
-		$this->addOption( 'password', 'Password on the target wiki', false, true, 'p' );
-		$this->addOption( 'startdate', 'Start point (20121222142317, 2012-12-22T14:23:17T, etc).', false, true );
-		$this->addOption( 'enddate', 'End point (20121222142317, 2012-12-22T14:23:17T, etc); defaults to current timestamp.', false, true );
-		$this->addOption( 'db', 'Database name, if we don\'t want to write to $wgDBname', false, true );
+		$this->addOption( 'startdate', 'Start point (20121222142317, 2012-12-22T14:23:17Z, etc).', false, true );
+		$this->addOption( 'enddate', 'End point (20121222142317, 2012-12-22T14:23:17Z, etc); defaults to current timestamp.', false, true );
 	}
 
 	public function execute() {
-		global $wgDBname;
+		parent::execute();
 
-		$url = $this->getOption( 'url' );
-		if ( !$url ) {
-			$this->fatalError( 'The URL to the target wiki\'s api.php is required!' );
-		}
-		$user = $this->getOption( 'username' );
-		$password = $this->getOption( 'password' );
 		$startDate = $this->getOption( 'startdate' );
 		if ( $startDate ) {
 			if ( !wfTimestamp( TS_ISO_8601, $startDate ) ) {
@@ -65,33 +42,6 @@ class GrabUserBlocks extends Maintenance {
 			}
 		} else {
 			$endDate = wfTimestampNow();
-		}
-
-		# Get a single DB_MASTER connection
-		$this->dbw = wfGetDB( DB_MASTER, [], $this->getOption( 'db', $wgDBname ) );
-
-		# bot class and log in if requested
-		if ( $user && $password ) {
-			$this->bot = new MediaWikiBot(
-				$url,
-				'json',
-				$user,
-				$password,
-				'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:13.0) Gecko/20100101 Firefox/13.0.1'
-			);
-			if ( !$this->bot->login() ) {
-				$this->output( "Logged in as $user...\n" );
-			} else {
-				$this->fatalError( "Failed to log in as $user." );
-			}
-		} else {
-			$this->bot = new MediaWikiBot(
-				$url,
-				'json',
-				'',
-				'',
-				'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:13.0) Gecko/20100101 Firefox/13.0.1'
-			);
 		}
 
 		$params = [
@@ -146,13 +96,21 @@ class GrabUserBlocks extends Maintenance {
 	public function processEntry( $entry ) {
 		$ts = wfTimestamp( TS_MW, $entry['timestamp'] );
 
+		$userIdentity = $this->getUserIdentity( $entry['byid'], $entry['by'] );
+		$performer = User::newFromIdentity( $userIdentity );
+
+		$commentStore = MediaWikiServices::getInstance()->getCommentStore();
+		$commentFields = $commentStore->insert( $this->dbw, 'ipb_reason', $entry['reason'] );
+		$actorMigration = ActorMigration::newMigration();
+		$actorFields = $actorMigration->getInsertValues( $this->dbw, 'ipb_by', $performer );
+
 		$data = [
 			'ipb_id' => $entry['id'],
 			'ipb_address' => $entry['user'],
 			'ipb_user' => $entry['userid'],
-			'ipb_by' => $entry['byid'],
-			'ipb_by_text' => $entry['by'],
-			'ipb_reason' => $entry['reason'],
+			#'ipb_by' => $entry['byid'],
+			#'ipb_by_text' => $entry['by'],
+			#'ipb_reason' => $entry['reason'],
 			'ipb_timestamp' => $ts,
 			'ipb_auto' => 0,
 			'ipb_anon_only' => isset( $entry['anononly'] ),
@@ -164,7 +122,7 @@ class GrabUserBlocks extends Maintenance {
 			'ipb_deleted' => isset( $entry['hidden'] ),
 			'ipb_block_email' => isset( $entry['noemail'] ),
 			'ipb_allow_usertalk' => isset( $entry['allowusertalk'] ),
-		];
+		] + $commentFields + $actorFields;
 		$this->dbw->insert( 'ipblocks', $data, __METHOD__ );
 		$this->dbw->commit();
 	}
