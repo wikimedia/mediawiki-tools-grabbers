@@ -245,7 +245,7 @@ abstract class FileGrabber extends ExternalWikiGrabber {
 		$commentStore = MediaWikiServices::getInstance()->getCommentStore();
 		$commentFields = $commentStore->insert( $this->dbw, 'oi_description', $comment );
 		$actorMigration = ActorMigration::newMigration();
-		$actorFields = $actorMigration->getInsertValues( $this->dbw, 'img_user', $performer );
+		$actorFields = $actorMigration->getInsertValues( $this->dbw, 'oi_user', $performer );
 
 		# Old version
 		$e = [
