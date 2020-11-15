@@ -32,7 +32,7 @@ class GrabUserGroups extends ExternalWikiGrabber {
 		parent::__construct();
 		$this->mDescription = 'Grabs user group assignments from a pre-existing wiki into a new wiki.';
 		$this->addOption( 'groups', 'Get only a specific list of groups (pipe separated list of group names, by default everything except *, user and autoconfirmed)', false, true );
-		$this->addOption( 'wikia', 'Set this param if the target wiki is on Wikia, which uses a different API', false, false );
+		$this->addOption( 'wikia', 'Set this param if the target wiki is on Wikia/Fandom, to automatically skip most of the global user groups that are irrelevant outside there', false, false );
 	}
 
 	public function execute() {
@@ -45,8 +45,8 @@ class GrabUserGroups extends ExternalWikiGrabber {
 
 		$this->output( "Getting user group information.\n" );
 
-		# TODO Less redundant switch ...
-		# Wikia has a custom api module for this, because they accidentally removed the original
+		$more = true;
+
 		if ( $this->getOption( 'wikia' ) ) {
 			# They have a few extra usergroups we probably don't want...
 			$this->badGroups = array_merge( $this->badGroups, [
@@ -71,73 +71,41 @@ class GrabUserGroups extends ExternalWikiGrabber {
 				'voldev',
 				'vstf'
 			] );
-
-			$params = [
-				'list' => 'groupmembers',
-				'gmgroups' => implode( '|', $this->getGroups() ),
-				'gmlimit' => 'max',
-			];
-
-			$userCount = 0;
-
-			do {
-				$data = $this->bot->query( $params );
-				$stuff = [];
-
-				foreach( $data['users'] as $user ) {
-					foreach ( $user['groups'] as $group ) {
-						if ( in_array( $group, $this->groups ) ) {
-							$stuff[] = [ 'ug_user' => $user['userid'], 'ug_group' => $group ];
-						}
-					}
-					$userCount++;
-				}
-
-				if ( count( $stuff ) ) {
-					$this->insertRows( $stuff );
-				}
-				if ( isset( $data['query-continue'] ) ) {
-					$params['gmoffset'] = $data['query-continue']['groupmembers']['gmoffset'];
-					$more = true;
-				} else {
-					$more = false;
-				}
-			} while ( $more );
-		} else {
-			$params = [
-				'list' => 'allusers',
-				'aulimit' => 'max',
-				'auprop' => 'groups',
-				'augroup' => implode( '|', $this->getGroups() )
-			];
-
-			$userCount = 0;
-
-			do {
-				$data = $this->bot->query( $params );
-				$stuff = [];
-
-				foreach ( $data['query']['allusers'] as $user ) {
-					foreach ( $user['groups'] as $group ) {
-						if ( in_array( $group, $this->groups ) ) {
-							$stuff[] = [ 'ug_user' => $user['userid'], 'ug_group' => $group ];
-						}
-					}
-					$userCount++;
-				}
-
-				if ( count( $stuff ) ) {
-					$this->insertRows( $stuff );
-				}
-				if ( isset( $data['query-continue'] ) ) {
-					// @todo don't hardcode parameter names
-					$params['aufrom'] = $data['query-continue']['allusers']['aufrom'];
-					$more = true;
-				} else {
-					$more = false;
-				}
-			} while ( $more );
 		}
+
+		$params = [
+			'list' => 'allusers',
+			'aulimit' => 'max',
+			'auprop' => 'groups',
+			'augroup' => implode( '|', $this->getGroups() )
+		];
+
+		$userCount = 0;
+
+		do {
+			$data = $this->bot->query( $params );
+			$stuff = [];
+
+			foreach ( $data['query']['allusers'] as $user ) {
+				foreach ( $user['groups'] as $group ) {
+					if ( in_array( $group, $this->groups ) ) {
+						$stuff[] = [ 'ug_user' => $user['userid'], 'ug_group' => $group ];
+					}
+				}
+				$userCount++;
+			}
+
+			if ( count( $stuff ) ) {
+				$this->insertRows( $stuff );
+			}
+			if ( isset( $data['query-continue'] ) && isset( $data['query-continue']['allusers'] ) ) {
+				$params = array_merge( $params, $data['query-continue']['allusers'] );
+			} elseif ( isset( $data['continue'] ) ) {
+				$params = array_merge( $params, $data['continue'] );
+			} else {
+				$more = false;
+			}
+		} while ( $more );
 
 		$this->output( "Processed $userCount users.\n" );
 	}

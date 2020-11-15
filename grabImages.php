@@ -67,14 +67,11 @@ class GrabImages extends Maintenance {
 
 		$i = 0;
 
+		if ( $aifrom !== null ) {
+			$params['aifrom'] = $aifrom;
+		}
+
 		do {
-			if ( $aifrom === null ) {
-				$FUCKING_SECURITY_REDIRECT_BULLSHIT = '';
-				unset( $params['aifrom'] );
-			} else {
-				$FUCKING_SECURITY_REDIRECT_BULLSHIT = '&amp;*';
-				$params['aifrom'] = $aifrom;
-			}
 			// Anno Domini 2015 and we (who's we?) still give a crap about IE6,
 			// apparently. Giving a crap about ancient IEs also means taking a
 			// dump over my API requests, it seems. Without this fucking bullshit
@@ -83,7 +80,7 @@ class GrabImages extends Maintenance {
 			// JSON we're expecting. Lovely. Just fucking lovely.
 			// --an angry ashley on 14 June 2015
 			// @see https://phabricator.wikimedia.org/T91439
-			$q = $this->getOption( 'url' ) . '?' . wfArrayToCGI( $params ) . $FUCKING_SECURITY_REDIRECT_BULLSHIT;
+			$q = $this->getOption( 'url' ) . '?' . wfArrayToCGI( $params ) . '&amp;*';
 			$this->output( 'Going to query the URL ' . $q . "\n" );
 			$result = Http::get( $q, 'default',
 				// Fake up the user agent string, just in case...
@@ -132,13 +129,14 @@ class GrabImages extends Maintenance {
 					$this->output( $img['name'] . '- HASH NOT OK (expected: ' . $img['sha1'] . ' but got ' . $hash . ")\n" );
 				}
 
-				if ( isset( $data['query-continue'] ) ) {
-					$aifrom = $data['query-continue']['allimages']['aifrom'];
+				if ( isset( $data['query-continue'] ) && isset( $data['query-continue']['allimages'] ) ) {
+					$params = array_merge( $data['query-continue']['allimages'] );
+				} elseif ( isset( $data['continue'] ) ) {
+					$params = array_merge( $params, $data['continue'] );
 				} else {
-					$aifrom = null;
+					$more = false;
 				}
 
-				$more = !( $aifrom === null );
 				$i++;
 			}
 		} while ( $more );

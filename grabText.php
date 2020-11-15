@@ -135,9 +135,11 @@ class GrabText extends TextGrabber {
 				}
 				$nsPageCount += $resultsCount;
 
+				# Add continuation parameters
 				if ( isset( $result['query-continue'] ) && isset( $result['query-continue']['allpages'] ) ) {
-					# Add continuation parameters
 					$params = array_merge( $params, $result['query-continue']['allpages'] );
+				} elseif ( isset( $result['continue'] ) ) {
+					$params = array_merge( $params, $result['continue'] );
 				} else {
 					$more = false;
 				}
@@ -305,9 +307,11 @@ class GrabText extends TextGrabber {
 				$revisionsProcessed = $this->processRevision( $revision, $pageID, $title ) || $revisionsProcessed;
 			}
 
+			# Add continuation parameters
 			if ( isset( $result['query-continue'] ) && isset( $result['query-continue']['revisions'] ) ) {
-				# Add continuation parameters
 				$params = array_merge( $params, $result['query-continue']['revisions'] );
+			} elseif ( isset( $result['continue'] ) ) {
+				$params = array_merge( $params, $result['continue'] );
 			} else {
 				break;
 			}

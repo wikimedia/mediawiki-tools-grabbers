@@ -66,19 +66,11 @@ class GrabNewText extends TextGrabber {
 	 */
 	protected $movedTitles = [];
 
-	/**
-	 * The target wiki is on Wikia
-	 *
-	 * @var boolean
-	 */
-	protected $isWikia;
-
 	public function __construct() {
 		parent::__construct();
 		$this->mDescription = "Grab new changes from an external wiki and add it over an imported dump.\nFor use when the available dump is slightly out of date.";
 		$this->addOption( 'startdate', 'Start point (20121222142317, 2012-12-22T14:23:17Z, etc); note that this cannot go back further than 1-3 months on most projects', true, true );
 		$this->addOption( 'namespaces', 'A pipe-separated list of namespaces (ID) to grab changes from. Defaults to all namespaces', false, true );
-		$this->addOption( 'wikia', 'Set this param if the target wiki is on Wikia, to perform some optimizations', false, false );
 	}
 
 	public function execute() {
@@ -96,8 +88,6 @@ class GrabNewText extends TextGrabber {
 		if ( $this->hasOption( 'namespaces' ) ) {
 			$this->namespaces = explode( '|', $this->getOption( 'namespaces' ) );
 		}
-
-		$this->isWikia = $this->getOption( 'wikia' );
 
 		# Get last revision id to avoid duplicates
 		$this->lastRevision = (int)$this->dbw->selectField(
@@ -132,9 +122,9 @@ class GrabNewText extends TextGrabber {
 			'rctype' => 'edit|new',
 			'rclimit' => 'max',
 			'rcprop' => 'title|sizes|redirect|ids',
+			'rcstart' => $this->startDate,
 			'rcend' => $this->endDate
 		];
-		$rcstart = $this->startDate;
 		$count = 0;
 		$more = true;
 		if ( !is_null( $this->namespaces ) ) {
@@ -143,8 +133,6 @@ class GrabNewText extends TextGrabber {
 
 		$this->output( "Retreiving list of changed pages...\n" );
 		while ( $more ) {
-			$params['rcstart'] = $rcstart;
-
 			$result = $this->bot->query( $params );
 			if ( empty( $result['query']['recentchanges'] ) ) {
 				$this->output( 'No changes found...' );
@@ -181,12 +169,13 @@ class GrabNewText extends TextGrabber {
 
 				$count++;
 			}
-			if ( isset( $result['query-continue'] ) ) {
-				$rcstart = $result['query-continue']['recentchanges']['rcstart'];
+			if ( isset( $result['query-continue'] ) && isset( $result['query-continue']['recentchanges'] ) ) {
+				$params = array_merge( $params, $result['query-continue']['recentchanges'] );
+			} elseif ( isset( $result['continue'] ) ) {
+				$params = array_merge( $params, $result['continue'] );
 			} else {
-				$rcstart = null;
+				$more = false;
 			}
-			$more = !( $rcstart === null );
 		}
 		$this->output( "\n" );
 	}
@@ -199,26 +188,15 @@ class GrabNewText extends TextGrabber {
 			'list' => 'logevents',
 			'ledir' => 'newer',
 			'lelimit' => 'max',
+			'lestart' => $this->startDate,
 			'leend' => $this->endDate
 		];
 
-		if ( $this->isWikia ) {
-			# letype doesn't accept multiple values. Multiple values work only
-			# on wikia but breaks on other standard wikis
-			$params['letype'] = 'delete|upload|move|protect';
-		}
-
-		$lestart = null;
 		$count = 0;
 		$more = true;
 
 		$this->output( "Updating deleted and moved items...\n" );
 		while ( $more ) {
-			if ( $lestart === null ) {
-				$params['lestart'] = $this->startDate;
-			} else {
-				$params['lestart'] = $lestart;
-			}
 			$result = $this->bot->query( $params );
 			if ( empty( $result['query']['logevents'] ) ) {
 				$this->output( "No changes found...\n" );
@@ -336,12 +314,13 @@ class GrabNewText extends TextGrabber {
 					$count++;
 				}
 			}
-			if ( isset( $result['query-continue'] ) ) {
-				$lestart = $result['query-continue']['logevents']['lestart'];
+			if ( isset( $result['query-continue'] ) && isset( $result['query-continue']['logevents'] ) ) {
+				$params = array_merge( $params, $result['query-continue']['logevents'] );
+			} elseif ( isset( $result['continue'] ) ) {
+				$params = array_merge( $params,  $result['continue'] );
 			} else {
-				$lestart = null;
+				$more = false;
 			}
-			$more = !( $lestart === null );
 		}
 		$this->output( "\n" );
 	}
@@ -527,9 +506,11 @@ class GrabNewText extends TextGrabber {
 				}
 			}
 
+			# Add continuation parameters
 			if ( isset( $result['query-continue'] ) && isset( $result['query-continue']['revisions'] ) ) {
-				# Add continuation parameters
 				$params = array_merge( $params, $result['query-continue']['revisions'] );
+			} elseif ( isset( $result['continue'] ) ) {
+				$params = array_merge( $params, $result['continue'] );
 			} else {
 				break;
 			}
@@ -789,9 +770,11 @@ class GrabNewText extends TextGrabber {
 				}
 			}
 
+			# Add continuation parameters
 			if ( isset( $result['query-continue'] ) && isset( $result['query-continue']['deletedrevs'] ) ) {
-				# Add continuation parameters
 				$params = array_merge( $params, $result['query-continue']['deletedrevs'] );
+			} elseif ( isset( $result['continue'] ) ) {
+				$params = array_merge( $params, $result['continue'] );
 			} else {
 				break;
 			}

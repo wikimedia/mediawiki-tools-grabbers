@@ -187,19 +187,18 @@ class GrabDeletedText extends TextGrabber {
 					$nsRevisions = $this->processDeletedRevisions( $pageChunk, $nsRevisions );
 				}
 
-				if ( isset( $result['query-continue'] ) ) {
+				if ( isset( $result['query-continue'] ) && isset( $result['query-continue']['deletedrevs'] ) ) {
 					# Ancient way of api pagination
 					# TODO: Document what is this for. Examples welcome
 					$drcontinue = str_replace( '&', '%26', $result['query-continue']['deletedrevs']['drcontinue'] );
+					$params = array_merge( $params, $result['query-continue']['deletedrevs'] );
 				} elseif ( isset( $result['continue'] ) ) {
 					# New pagination
-					# FIXME: A page with lots of deleted revisions will also paginate on those revisions
-					# This script doesn't support title pagination!!
 					$drcontinue = $result['continue']['drcontinue'];
+					$params = array_merge( $params, $result['continue'] );
 				} else {
-					$drcontinue = null;
+					$more = false;
 				}
-				$more = !( $drcontinue === null );
 				$this->output( "drcontinue = $drcontinue\n" );
 			}
 			$this->output( "$nsRevisions chunks of revisions processed in namespace $ns.\n" );

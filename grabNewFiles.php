@@ -79,22 +79,15 @@ class GrabNewFiles extends FileGrabber {
 			'leprop' => 'ids|title|type|timestamp|details|comment|userid',
 			'leend' => (string)$this->endDate,
 			'ledir' => 'newer',
+			'lestart' => (string)$this->startDate,
 			'lelimit' => 'max'
 		];
 
-		if ( $this->isWikia ) {
-			# letype doesn't accept multiple values. Multiple values work only
-			# on wikia but breaks on other standard wikis
-			$params['letype'] = 'delete|upload|move';
-		}
-
-		$lestart = (string)$this->startDate;
 		$more = true;
 		$count = 0;
 
 		$this->output( "Processing and downloading changes from files...\n" );
 		while ( $more ) {
-			$params['lestart'] = $lestart;
 			$result = $this->bot->query( $params );
 			if ( empty( $result['query']['logevents'] ) ) {
 				$this->output( "No changes found...\n" );
@@ -128,12 +121,13 @@ class GrabNewFiles extends FileGrabber {
 				}
 			}
 
-			if ( isset( $result['query-continue'] ) ) {
-				$lestart = $result['query-continue']['logevents']['lestart'];
+			if ( isset( $result['query-continue'] ) && isset( $result['query-continue']['logevents'] ) ) {
+				$params = array_merge( $params, $result['query-continue']['logevents'] );
+			} elseif ( isset( $result['continue'] ) ) {
+				$params = array_merge( $params, $result['continue'] );
 			} else {
-				$lestart = null;
+				$more = false;
 			}
-			$more = !( $lestart === null );
 		}
 		# Process pending queues now
 		foreach ( $this->pendingUploads as $title ) {
@@ -530,12 +524,13 @@ class GrabNewFiles extends FileGrabber {
 				}
 				$count++;
 			}
-			if ( isset( $result['query-continue'] ) ) {
-				$iistart = $result['query-continue']['imageinfo']['iistart'];
+			if ( isset( $result['query-continue'] ) && isset( $result['query-continue']['imageinfo'] ) ) {
+				$params = array_merge( $params, $result['query-continue']['imageinfo'] );
+			} elseif ( isset( $result['continue'] ) ) {
+				$params = array_merge( $params, $result['continue'] );
 			} else {
-				$iistart = null;
+				$more = false;
 			}
-			$more = !( $iistart === null );
 			$count++;
 		}
 	}
@@ -592,9 +587,6 @@ class GrabNewFiles extends FileGrabber {
 		$count = 0;
 		# NOTE: imageinfo returns revisions from newer to older
 		while ( $more ) {
-			if ( !is_null( $iistart ) ) {
-				$params['iistart'] = $iistart;
-			}
 			$result = $this->bot->query( $params );
 			# Api always returns an entry for title
 			$page = array_values( $result['query']['pages'] )[0];
@@ -727,12 +719,13 @@ class GrabNewFiles extends FileGrabber {
 				}
 				$count++;
 			}
-			if ( isset( $result['query-continue'] ) ) {
-				$iistart = $result['query-continue']['imageinfo']['iistart'];
+			if ( isset( $result['query-continue'] ) && isset( $result['query-continue']['imageinfo'] ) ) {
+				$params = array_merge( $params, $result['query-continue']['imageinfo'] );
+			} elseif ( isset( $result['continue'] ) ) {
+				$params = array_merge( $params, $result['continue'] );
 			} else {
-				$iistart = null;
+				$more = false;
 			}
-			$more = !( $iistart === null );
 			$count++;
 		}
 		if ( count( $idsToRestore ) > 0 ) {

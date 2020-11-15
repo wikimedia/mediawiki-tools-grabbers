@@ -50,23 +50,17 @@ class GrabProtectedTitles extends ExternalWikiGrabber {
 		$params = [
 			'list' => 'protectedtitles',
 			'ptdir' => 'newer',
+			'ptstart' => $startDate,
 			'ptend' => $endDate,
 			'ptlimit' => 'max',
 			'ptprop' => 'userid|timestamp|expiry|comment|level',
 		];
 
 		$more = true;
-		$ptstart = $startDate;
 		$i = 0;
 
 		$this->output( "Grabbing protected titles...\n" );
 		do {
-			if ( $ptstart === null ) {
-				unset( $params['ptstart'] );
-			} else {
-				$params['ptstart'] = $ptstart;
-			}
-
 			$result = $this->bot->query( $params );
 
 			if ( empty( $result['query']['protectedtitles'] ) ) {
@@ -77,14 +71,15 @@ class GrabProtectedTitles extends ExternalWikiGrabber {
 				$this->processEntry( $logEntry );
 				$i++;
 
-				if ( isset( $result['query-continue'] ) ) {
-					$ptstart = $result['query-continue']['protectedtitles']['ptstart'];
+				if ( isset( $result['query-continue'] ) && isset( $result['query-continue']['protectedtitles'] ) ) {
+					$params = array_merge( $params, $result['query-continue']['protectedtitles'] );
+					$this->output( "{$i} entries processed.\n" );
+				} elseif ( isset( $result['continue'] ) ) {
+					$params = array_merge( $params, $result['continue'] );
 					$this->output( "{$i} entries processed.\n" );
 				} else {
-					$ptstart = null;
+					$more = false;
 				}
-
-				$more = !( $ptstart === null );
 			}
 
 		} while ( $more );

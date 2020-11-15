@@ -72,6 +72,7 @@ class GrabLogs extends ExternalWikiGrabber {
 			if ( !$lestart ) {
 				$this->fatalError( 'Invalid start timestamp format.' );
 			}
+			$params['lestart'] = $lestart;
 		}
 		$leend = $this->getOption( 'end' );
 		if ( $leend ) {
@@ -79,6 +80,7 @@ class GrabLogs extends ExternalWikiGrabber {
 			if ( !$leend ) {
 				$this->fatalError( 'Invalid end timestamp format.' );
 			}
+			$params['leend'] = $leend;
 		}
 		$more = true;
 		$i = 0;
@@ -98,14 +100,6 @@ class GrabLogs extends ExternalWikiGrabber {
 
 		$this->output( "Fetching log events...\n" );
 		do {
-			if ( $lestart === null ) {
-				unset( $params['lestart'] );
-			} else {
-				$params['lestart'] = $lestart;
-			}
-			if ( !is_null( $leend ) ) {
-				$params['leend'] = $leend;
-			}
 			$result = $this->bot->query( $params );
 
 			if ( empty( $result['query']['logevents'] ) ) {
@@ -124,13 +118,14 @@ class GrabLogs extends ExternalWikiGrabber {
 				}
 				$currentIDs[] = $logEntry['logid'];
 
-				if ( isset( $result['query-continue'] ) ) {
-					$lestart = $result['query-continue']['logevents']['lestart'];
+				if ( isset( $result['query-continue'] ) && isset( $result['query-continue']['logevents'] ) ) {
+					$params = array_merge( $params, $result['query-continue']['logevents'] );
+				} elseif ( isset( $result['continue'] ) ) {
+					$params = array_merge( $params, $result['continue'] );
 				} else {
-					$lestart = null;
+					$more = false;
 				}
 
-				$more = !( $lestart === null );
 				$i++;
 				if ( $i % 500 == 0 ) {
 					$this->output( "{$i} logs fetched...\n" );
@@ -329,12 +324,14 @@ class GrabLogs extends ExternalWikiGrabber {
 						$unserializedParams['4::description'] = $explicitParams['description'];
 					}
 					$unserializedParams['5:bool:cascade'] = isset( $explicitParams['cascade'] );
-					$unserializedParams['details'] = $this->mapToTransformations(
-							$explicitParams['details'],
-							[ 'type', 'level' ],
-							[ 'expiry' ],
-							[ 'cascade' ]
-						);
+					if ( isset( $explicitParams['details'] ) ) {
+						$unserializedParams['details'] = $this->mapToTransformations(
+								$explicitParams['details'],
+								[ 'type', 'level' ],
+								[ 'expiry' ],
+								[ 'cascade' ]
+							);
+					}
 					break;
 				case 'delete':
 					if ( isset( $explicitParams['count'] ) ) {

@@ -52,18 +52,15 @@ class GrabUserBlocks extends ExternalWikiGrabber {
 			'bkprop' => 'id|user|userid|by|byid|timestamp|expiry|reason|range|flags',
 		];
 
+		if ( $startDate !== null ) {
+			$params['bkstart'] = $startDate;
+		}
+
 		$more = true;
-		$bkstart = $startDate;
 		$i = 0;
 
 		$this->output( "Grabbing blocks...\n" );
 		do {
-			if ( $bkstart === null ) {
-				unset( $params['bkstart'] );
-			} else {
-				$params['bkstart'] = $bkstart;
-			}
-
 			$result = $this->bot->query( $params );
 
 			if ( empty( $result['query']['blocks'] ) ) {
@@ -77,14 +74,15 @@ class GrabUserBlocks extends ExternalWikiGrabber {
 					$i++;
 				}
 
-				if ( isset( $result['query-continue'] ) ) {
-					$bkstart = $result['query-continue']['blocks']['bkstart'];
+				if ( isset( $result['query-continue'] ) && isset( $result['query-continue']['blocks'] ) ) {
+					$params = array_merge( $params, $result['query-continue']['blocks'] );
+					$this->output( "{$i} entries processed.\n" );
+				} elseif ( isset( $result['continue'] ) ) {
+					$params = array_merge( $params, $result['continue'] );
 					$this->output( "{$i} entries processed.\n" );
 				} else {
-					$bkstart = null;
+					$more = false;
 				}
-
-				$more = !( $bkstart === null );
 			}
 
 			# Readd the AUTO_INCREMENT here

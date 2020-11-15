@@ -61,11 +61,6 @@ class GrabFiles extends FileGrabber {
 
 		$this->output( "Processing and downloading files...\n" );
 		while ( $more ) {
-			if ( $gaifrom === null ) {
-				unset( $params['gaifrom'] );
-			} else {
-				$params['gaifrom'] = $gaifrom;
-			}
 			$result = $this->bot->query( $params );
 			if ( empty( $result['query']['pages'] ) ) {
 				$this->fatalError( 'No files found...' );
@@ -77,10 +72,11 @@ class GrabFiles extends FileGrabber {
 
 			if ( isset( $result['query-continue'] ) ) {
 				$gaifrom = $result['query-continue']['allimages']['gaifrom'];
+			} elseif ( isset( $result['continue'] ) ) {
+				$params = array_merge( $params, $result['continue'] );
 			} else {
-				$gaifrom = null;
+				$more = false;
 			}
-			$more = !( $gaifrom === null );
 		}
 		$this->output( "$count files downloaded.\n" );
 	}

@@ -46,7 +46,7 @@ abstract class FileGrabber extends ExternalWikiGrabber {
 
 	public function __construct() {
 		parent::__construct();
-		$this->addOption( 'wikia', 'Set this param if the target wiki is on Wikia, which needs to handle URLs in a special way', false, false );
+		$this->addOption( 'wikia', 'Set this param if the target wiki is on Wikia/Fandom, which needs to handle URLs in a special way', false, false );
 	}
 
 	public function execute() {

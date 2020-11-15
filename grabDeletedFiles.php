@@ -98,16 +98,14 @@ class GrabDeletedFiles extends Maintenance {
 			];
 
 			$fafrom = $this->getOption( 'fafrom' );
+			if ( $fafrom !== null ) {
+				$params['fafrom'] = $fafrom;
+			}
 			$more = true;
 			$count = 0;
 
 			$this->output( "Processing file metadata...\n" );
 			while ( $more ) {
-				if ( $fafrom === null ) {
-					unset( $params['fafrom'] );
-				} else {
-					$params['fafrom'] = $fafrom;
-				}
 				$result = $this->bot->query( $params );
 				if ( empty( $result['query']['filearchive'] ) ) {
 					$this->fatalError( 'No files found...' );
@@ -121,12 +119,13 @@ class GrabDeletedFiles extends Maintenance {
 					$count++;
 				}
 
-				if ( isset( $result['query-continue'] ) ) {
-					$fafrom = $result['query-continue']['filearchive']['fafrom'];
+				if ( isset( $result['query-continue'] ) && isset( $result['query-continue']['filearchive'] ) ) {
+					$params = array_merge( $params, $result['query-continue']['filearchive'] );
+				} elseif ( isset( $result['continue'] ) ) {
+					$params = array_merge( $params, $result['continue'] );
 				} else {
-					$fafrom = null;
+					$more = false;
 				}
-				$more = !( $fafrom === null );
 			}
 			$this->output( "$count files found.\n" );
 
