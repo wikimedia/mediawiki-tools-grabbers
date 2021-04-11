@@ -326,6 +326,10 @@ abstract class FileGrabber extends ExternalWikiGrabber {
 	 */
 	function downloadFile( $fileurl, $targetTempFile, $sha1 = null ) {
 		$this->mTmpHandle = fopen( $targetTempFile, 'wb' );
+		if (!$this->mTmpHandle) {
+			$status = Status::newFatal( 'CANTCREATEFILE' ); # Not an existing message but whatever
+			return $status;
+		}
 		$req = MWHttpRequest::factory( $fileurl, [ 'timeout' => 90 ], __METHOD__ );
 		$req->setCallback( [ $this, 'saveTempFileChunk' ] );
 		$status = $req->execute();
