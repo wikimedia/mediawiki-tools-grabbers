@@ -180,8 +180,6 @@ abstract class TextGrabber extends ExternalWikiGrabber {
 	 * @return bool Whether revision has been inserted or not
 	 */
 	function insertArchivedRevision( $revision, $title ) {
-		global $wgMultiContentRevisionSchemaMigrationStage;
-
 		$revisionId = $revision['revid'];
 		$timestamp = wfTimestamp( TS_MW, $revision['timestamp'] );
 		$parentID = null;
@@ -220,12 +218,10 @@ abstract class TextGrabber extends ExternalWikiGrabber {
 		}
 
 		# This can probably break if user was suppressed and we don't have permissions to view it
-		$performer = User::newFromIdentity( $this->getUserIdentity( (int)$revision['userid'], $revision['user'] ) );
+		$actor = $this->getActorFromUser( (int)$revision['userid'], $revision['user'] );
 
 		$commentStore = MediaWikiServices::getInstance()->getCommentStore();
 		$commentFields = $commentStore->insert( $this->dbw, 'ar_comment', $comment );
-		$actorMigration = ActorMigration::newMigration();
-		$actorFields = $actorMigration->getInsertValues( $this->dbw, 'ar_user', $performer );
 
 		$e = [
 			'ar_namespace' => $title->getNamespace(),
@@ -233,6 +229,7 @@ abstract class TextGrabber extends ExternalWikiGrabber {
 			#'ar_comment' => $comment,
 			#'ar_user' => $revision['userid'],
 			#'ar_user_text' => $revision['user'],
+			'ar_actor' => $actor,
 			'ar_timestamp' => $timestamp,
 			'ar_minor_edit' => ( isset( $revision['minor'] ) ? 1 : 0 ),
 			'ar_rev_id' => $revisionId,
@@ -241,7 +238,7 @@ abstract class TextGrabber extends ExternalWikiGrabber {
 			'ar_sha1' => SlotRecord::base36Sha1( $text ),
 			#'ar_page_id' => NULL, # Not requred and unreliable from api
 			'ar_parent_id' => $parentID,
-		] + $commentFields + $actorFields;
+		] + $commentFields;
 
 		# Create content object
 		$content = ContentHandler::makeContent( $text, $title );
@@ -256,36 +253,27 @@ abstract class TextGrabber extends ExternalWikiGrabber {
 		# Insert content
 		$this->output( "Inserting archived revision {$revisionId}\n" );
 
-		# From RevisionStore::insertSlotOn()
-		# Write the main slot's text ID to the revision table for backwards compatibility
-		if ( $wgMultiContentRevisionSchemaMigrationStage & SCHEMA_COMPAT_WRITE_OLD ) {
-			$textId = $this->blobStore->getTextIdFromAddress( $blobAddress );
-			$e['ar_text_id'] = $textId;
-		}
+		# From RevisionStore::insertContentRowOn()
+		$contentRow = [
+			'content_size' => $slot->getSize(),
+			'content_sha1' => $slot->getSha1(),
+			'content_model' => $this->contentModelStore->acquireId( $slot->getModel() ),
+			'content_address' => $blobAddress,
+		];
+		$this->dbw->insert( 'content', $contentRow, __METHOD__ );
+		$contentId = intval( $this->dbw->insertId() );
 
-		if ( $wgMultiContentRevisionSchemaMigrationStage & SCHEMA_COMPAT_WRITE_NEW ) {
-			# From RevisionStore::insertContentRowOn()
-			$contentRow = [
-				'content_size' => $slot->getSize(),
-				'content_sha1' => $slot->getSha1(),
-				'content_model' => $this->contentModelStore->acquireId( $slot->getModel() ),
-				'content_address' => $blobAddress,
-			];
-			$this->dbw->insert( 'content', $contentRow, __METHOD__ );
-			$contentId = intval( $this->dbw->insertId() );
-
-			# From RevisionStore::insertSlotRowOn()
-			$slotRow = [
-				'slot_revision_id' => $revisionId,
-				'slot_role_id' => $this->slotRoleStore->acquireId( $slot->getRole() ),
-				'slot_content_id' => $contentId,
-				'slot_origin' => $revisionId,
-			];
-			$this->dbw->insert( 'slots', $slotRow, __METHOD__, [ 'IGNORE' ] );
-			if ( $this->dbw->affectedRows() === 0 ) {
-				$this->output( "slot_revision_id {$revisionId} already exists in slots table; skipping\n" );
-				return false;
-			}
+		# From RevisionStore::insertSlotRowOn()
+		$slotRow = [
+			'slot_revision_id' => $revisionId,
+			'slot_role_id' => $this->slotRoleStore->acquireId( $slot->getRole() ),
+			'slot_content_id' => $contentId,
+			'slot_origin' => $revisionId,
+		];
+		$this->dbw->insert( 'slots', $slotRow, __METHOD__, [ 'IGNORE' ] );
+		if ( $this->dbw->affectedRows() === 0 ) {
+			$this->output( "slot_revision_id {$revisionId} already exists in slots table; skipping\n" );
+			return false;
 		}
 
 		$this->dbw->insert(

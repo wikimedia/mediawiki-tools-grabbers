@@ -12,6 +12,8 @@
  * @date 5 August 2019
  */
 
+use MediaWiki\MediaWikiServices;
+
 require_once 'includes/TextGrabber.php';
 
 class GrabText extends TextGrabber {
@@ -160,8 +162,6 @@ class GrabText extends TextGrabber {
 	 *     page title, namespace, protection status and more...
 	 */
 	function processPage( $page ) {
-		global $wgContentHandlerUseDB;
-
 		$pageID = $page['pageid'];
 
 		$this->output( "Processing page id $pageID...\n" );
@@ -169,16 +169,13 @@ class GrabText extends TextGrabber {
 		$params = [
 			'prop' => 'info|revisions',
 			'rvlimit' => 'max',
-			'rvprop' => 'ids|flags|timestamp|user|userid|comment|content|tags',
+			'rvprop' => 'ids|flags|timestamp|user|userid|comment|content|tags|contentmodel',
 			'rvdir' => 'newer',
 			'rvend' => wfTimestamp( TS_ISO_8601, $this->endDate )
 		];
 		$params['pageids'] = $pageID;
 		if ( $page['protection'] ) {
 			$params['inprop'] = 'protection';
-		}
-		if ( $wgContentHandlerUseDB ) {
-			$params['rvprop'] = $params['rvprop'] . '|contentmodel';
 		}
 
 		$result = $this->bot->query( $params );
@@ -230,11 +227,12 @@ class GrabText extends TextGrabber {
 		$page_e['counter'] = ( isset( $info_pages[0]['counter'] ) ? $info_pages[0]['counter'] : 0 );
 		$page_e['latest'] = $info_pages[0]['lastrevid'];
 		$defaultModel = null;
-		if ( $wgContentHandlerUseDB && isset( $info_pages[0]['contentmodel'] ) ) {
+		if ( isset( $info_pages[0]['contentmodel'] ) ) {
 			# This would be the most accurate way of getting the content model for a page.
 			# However it calls hooks and can be incredibly slow or cause errors
 			#$defaultModel = ContentHandler::getDefaultModelFor( $title );
-			$defaultModel = MWNamespace::getNamespaceContentModel( $info_pages[0]['ns'] ) || CONTENT_MODEL_WIKITEXT;
+			$defaultModel = MediaWikiServices::getInstance()->getNamespaceInfo()->
+				getNamespaceContentModel( $info_pages[0]['ns'] ) || CONTENT_MODEL_WIKITEXT;
 			# Set only if not the default content model
 			if ( $defaultModel != $info_pages[0]['contentmodel'] ) {
 				$page_e['content_model'] = $info_pages[0]['contentmodel'];

@@ -220,8 +220,6 @@ class GrabDeletedText extends TextGrabber {
 	 * @returns int $nsRevisions updated
 	 */
 	function processDeletedRevisions( $pageChunk, $nsRevisions ) {
-		global $wgMultiContentRevisionSchemaMigrationStage;
-
 		# Go back if we're not actually to the start point yet.
 		if ( $this->badStart ) {
 			if ( str_replace( ' ', '_', $badStart ) > str_replace( ' ', '_', $pageChunk['title'] ) ) {

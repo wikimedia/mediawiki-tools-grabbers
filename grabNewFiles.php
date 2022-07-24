@@ -256,8 +256,6 @@ class GrabNewFiles extends FileGrabber {
 	 * @return bool Whether succeeded or not
 	 */
 	function moveToOldFile( $name, $oldArchiveName, $oldTimestamp ) {
-		global $wgActorTableSchemaMigrationStage;
-
 		$this->output( "Moving current file $name to archive $oldArchiveName\n" );
 
 		$fields = [
@@ -275,17 +273,9 @@ class GrabNewFiles extends FileGrabber {
 			'oi_media_type' => 'img_media_type',
 			'oi_major_mime' => 'img_major_mime',
 			'oi_minor_mime' => 'img_minor_mime',
-			'oi_sha1' => 'img_sha1'
+			'oi_sha1' => 'img_sha1',
+			'oi_actor' => 'img_actor'
 		];
-
-		# This is from LocalFile::recordUpload2()
-		if ( $wgActorTableSchemaMigrationStage & SCHEMA_COMPAT_WRITE_OLD ) {
-			$fields['oi_user'] = 'img_user';
-			$fields['oi_user_text'] = 'img_user_text';
-		}
-		if ( $wgActorTableSchemaMigrationStage & SCHEMA_COMPAT_WRITE_NEW ) {
-			$fields['oi_actor'] = 'img_actor';
-		}
 
 		$this->dbw->begin();
 		$this->dbw->insertSelect( 'oldimage', 'image',

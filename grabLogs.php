@@ -178,6 +178,8 @@ class GrabLogs extends ExternalWikiGrabber {
 			}
 		}
 
+		$performer = $this->getActorFromUser( (int)$entry['userid'], $entry['user'] );
+
 		$e = [
 			'log_id' => $entry['logid'],
 			'log_type' => $entry['type'],
@@ -189,6 +191,7 @@ class GrabLogs extends ExternalWikiGrabber {
 			#'log_user' => $entry['userid'],
 			#'log_user_text' => $entry['user'],
 			#'log_comment' => $wgContLang->truncateForDatabase( $entry['comment'], 255 ),
+			'log_actor' => $performer,
 			'log_params' => $this->encodeLogParams( $entry ),
 			'log_deleted' => $revdeleted
 		];
@@ -202,9 +205,6 @@ class GrabLogs extends ExternalWikiGrabber {
 
 		# Bits of code picked from ManualLogEntry::insert()
 		$e += CommentStore::getStore()->insert( $this->dbw, 'log_comment', $entry['comment'] );
-		$performer = User::newFromIdentity( $this->getUserIdentity( (int)$entry['userid'], $entry['user'] ) );
-		$e += ActorMigration::newMigration()
-			->getInsertValues( $this->dbw, 'log_user', $performer );
 
 		$this->dbw->insert( 'logging', $e, __METHOD__ );
 

@@ -33,6 +33,12 @@ abstract class ExternalWikiGrabber extends Maintenance {
 	 */
 	protected $bot;
 
+
+	/*
+	 * ActorStore instance
+	 */
+	private $actorStore;
+
 	public function __construct() {
 		parent::__construct();
 		$this->addOption( 'url', 'URL to the target wiki\'s api.php', true /* required? */, true /* withArg */, 'u' );
@@ -142,7 +148,20 @@ abstract class ExternalWikiGrabber extends Maintenance {
 			$actor = (int)$this->dbw->insertId();
 		}
 
-		return new UserIdentityValue( $id, $name, $actor );
+		return new UserIdentityValue( $id, $name );
+	}
+
+	/**
+	 * Gets an actor id or creates one if it doesn't exist
+	 *
+	 * @param int $id User id, or 0
+	 * @param string $name User name or IP address
+	 */
+	function getActorFromUser( $id, $name ) {
+		if ( $this->actorStore == null ) {
+			$this->actorStore = MediaWikiServices::getInstance()->getActorStore();
+		}
+		return $this->actorStore->acquireActorId( new UserIdentityValue( $id, $name ), $this->dbw );
 	}
 
 	/**

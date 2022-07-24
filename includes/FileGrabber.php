@@ -50,47 +50,12 @@ abstract class FileGrabber extends ExternalWikiGrabber {
 	}
 
 	public function execute() {
-		global $wgDBname;
-
-		$url = $this->getOption( 'url' );
-		if ( !$url ) {
-			$this->fatalError( 'The URL to the target wiki\'s api.php is required.' );
-		}
-
-		# Get a single DB_MASTER connection
-		$this->dbw = wfGetDB( DB_MASTER, [], $this->getOption( 'db', $wgDBname ) );
-
-		# Get a local repo instance
-		$this->localRepo = RepoGroup::singleton()->getLocalRepo();
+		parent::execute();
 
 		$this->isWikia = $this->getOption( 'wikia' );
 
-		$user = $this->getOption( 'username' );
-		$password = $this->getOption( 'password' );
-
-		# bot class and log in if requested
-		if ( $user && $password ) {
-			$this->bot = new MediaWikiBot(
-				$url,
-				'json',
-				$user,
-				$password,
-				'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:13.0) Gecko/20100101 Firefox/13.0.1'
-			);
-			if ( !$this->bot->login() ) {
-				$this->output( "Logged in as $user...\n" );
-			} else {
-				$this->fatalError( "Failed to log in as $user." );
-			}
-		} else {
-			$this->bot = new MediaWikiBot(
-				$url,
-				'json',
-				'',
-				'',
-				'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:13.0) Gecko/20100101 Firefox/13.0.1'
-			);
-		}
+		# Get a local repo instance
+		$this->localRepo = MediaWikiServices::getInstance()->getRepoGroup()->getLocalRepo();
 	}
 
 	/**
@@ -140,12 +105,10 @@ abstract class FileGrabber extends ExternalWikiGrabber {
 		$file_e['major_mime'] = substr( $mime, 0, $mimeBreak );
 		$file_e['minor_mime'] = substr( $mime, $mimeBreak + 1 );
 
-		$performer = User::newFromIdentity( $this->getUserIdentity( (int)$file_e['user'], $file_e['user_text'] ) );
+		$actor = $this->getActorFromUser( (int)$file_e['user'], $file_e['user_text'] );
 
 		$commentStore = MediaWikiServices::getInstance()->getCommentStore();
 		$commentFields = $commentStore->insert( $this->dbw, 'img_description', $comment );
-		$actorMigration = ActorMigration::newMigration();
-		$actorFields = $actorMigration->getInsertValues( $this->dbw, 'img_user', $performer );
 
 		# Current version
 		$e = [
@@ -157,13 +120,14 @@ abstract class FileGrabber extends ExternalWikiGrabber {
 			#'img_description' => $file_e['description'],
 			#'img_user' => $file_e['user'],
 			#'img_user_text' => $file_e['user_text'],
+			'img_actor' => $actor,
 			'img_timestamp' => $file_e['timestamp'],
 			'img_media_type' => $file_e['media_type'],
 			'img_sha1' => $file_e['sha1'],
 			'img_metadata' => $file_e['metadata'],
 			'img_major_mime' => $file_e['major_mime'],
 			'img_minor_mime' => $file_e['minor_mime']
-		] + $commentFields + $actorFields;
+		] + $commentFields;
 		$this->dbw->insert( 'image', $e, __METHOD__ );
 		$status = $this->storeFileFromURL( $name, $fileurl, false );
 		$this->output( "Done\n" );
@@ -240,12 +204,8 @@ abstract class FileGrabber extends ExternalWikiGrabber {
 		$file_e['major_mime'] = substr( $mime, 0, $mimeBreak );
 		$file_e['minor_mime'] = substr( $mime, $mimeBreak + 1 );
 
-		$performer = User::newFromIdentity( $this->getUserIdentity( (int)$file_e['user'], $file_e['user_text'] ) );
-
 		$commentStore = MediaWikiServices::getInstance()->getCommentStore();
 		$commentFields = $commentStore->insert( $this->dbw, 'oi_description', $comment );
-		$actorMigration = ActorMigration::newMigration();
-		$actorFields = $actorMigration->getInsertValues( $this->dbw, 'oi_user', $performer );
 
 		# Old version
 		$e = [
@@ -258,6 +218,7 @@ abstract class FileGrabber extends ExternalWikiGrabber {
 			#'oi_description' => $file_e['description'],
 			#'oi_user' => $file_e['user'],
 			#'oi_user_text' => $file_e['user_text'],
+			'oi_actor' => $this->getActorFromUser( (int)$file_e['user'], $file_e['user_text'] ),
 			'oi_timestamp' => $file_e['timestamp'],
 			'oi_media_type' => $file_e['media_type'],
 			'oi_deleted' => $file_e['deleted'],
@@ -265,7 +226,7 @@ abstract class FileGrabber extends ExternalWikiGrabber {
 			'oi_metadata' => $file_e['metadata'],
 			'oi_major_mime' => $file_e['major_mime'],
 			'oi_minor_mime' => $file_e['minor_mime']
-		] + $commentFields + $actorFields;
+		] + $commentFields;
 		$this->dbw->insert( 'oldimage', $e, __METHOD__ );
 		$status = $this->storeFileFromURL( $name, $fileurl, $file_e['timestamp'] );
 		$this->output( "Done\n" );
@@ -330,7 +291,8 @@ abstract class FileGrabber extends ExternalWikiGrabber {
 			$status = Status::newFatal( 'CANTCREATEFILE' ); # Not an existing message but whatever
 			return $status;
 		}
-		$req = MWHttpRequest::factory( $fileurl, [ 'timeout' => 90 ], __METHOD__ );
+		$req = MediaWikiServices::getInstance()->getHttpRequestFactory()
+			->create( $fileurl, [ 'timeout' => 90 ], __METHOD__ );
 		$req->setCallback( [ $this, 'saveTempFileChunk' ] );
 		$status = $req->execute();
 		fclose( $this->mTmpHandle );

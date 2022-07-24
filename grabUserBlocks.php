@@ -94,13 +94,8 @@ class GrabUserBlocks extends ExternalWikiGrabber {
 	public function processEntry( $entry ) {
 		$ts = wfTimestamp( TS_MW, $entry['timestamp'] );
 
-		$userIdentity = $this->getUserIdentity( $entry['byid'], $entry['by'] );
-		$performer = User::newFromIdentity( $userIdentity );
-
 		$commentStore = MediaWikiServices::getInstance()->getCommentStore();
 		$commentFields = $commentStore->insert( $this->dbw, 'ipb_reason', $entry['reason'] );
-		$actorMigration = ActorMigration::newMigration();
-		$actorFields = $actorMigration->getInsertValues( $this->dbw, 'ipb_by', $performer );
 
 		$data = [
 			'ipb_id' => $entry['id'],
@@ -109,6 +104,7 @@ class GrabUserBlocks extends ExternalWikiGrabber {
 			#'ipb_by' => $entry['byid'],
 			#'ipb_by_text' => $entry['by'],
 			#'ipb_reason' => $entry['reason'],
+			'ipb_by_actor' => $this->getActorFromUser( $entry['byid'], $entry['by'] ),
 			'ipb_timestamp' => $ts,
 			'ipb_auto' => 0,
 			'ipb_anon_only' => isset( $entry['anononly'] ),
@@ -120,7 +116,7 @@ class GrabUserBlocks extends ExternalWikiGrabber {
 			'ipb_deleted' => isset( $entry['hidden'] ),
 			'ipb_block_email' => isset( $entry['noemail'] ),
 			'ipb_allow_usertalk' => isset( $entry['allowusertalk'] ),
-		] + $commentFields + $actorFields;
+		] + $commentFields;
 		$this->dbw->insert( 'ipblocks', $data, __METHOD__ );
 		$this->dbw->commit();
 	}

@@ -70,20 +70,6 @@ class GrabDeletedFiles extends Maintenance {
 		if ( !$this->bot->login() ) {
 			$this->output( "Logged in as {$this->user}...\n" );
 			$this->lastLogin = time();
-
-			# Commented out, this doesn't work on Wikia. Simply let the api
-			# error out on first deletedrevs access
-			# Does the user have deletion rights?
-			#$params = [
-			#	'list' => 'allusers',
-			#	'aulimit' => '1',
-			#	'auprop' => 'rights',
-			#	'aufrom' => $this->user
-			#];
-			#$result = $this->bot->query( $params );
-			#if ( !in_array( 'deletedtext', $result['query']['allusers'][0]['rights'] ) ) {
-			#	$this->fatalError( "{$this->user} does not have required rights to fetch deleted content." );
-			#}
 		} else {
 			$this->fatalError( "Failed to log in as {$this->user}." );
 		}
@@ -170,9 +156,7 @@ class GrabDeletedFiles extends Maintenance {
 				# $imagesurl should be something like http://images.wikia.com/uncyclopedia/images
 				# Example image: http://images.wikia.com/uncyclopedia/images/deleted/a/b/c/abcblahhash.png
 				$fileurl = $imagesurl . '/deleted/' . $file[0] . '/' . $file[1] . '/' . $file[2] . '/' . $file;
-				Wikimedia\suppressWarnings();
-				$fileContent = file_get_contents( $fileurl );
-				Wikimedia\restoreWarnings();
+				$fileContent = @file_get_contents( $fileurl );
 
 				if ( !$fileContent ) {
 					$this->output( ": not found on remote server.\n" );

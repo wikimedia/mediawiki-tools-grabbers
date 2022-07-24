@@ -50,11 +50,14 @@ class GrabProtectedTitles extends ExternalWikiGrabber {
 		$params = [
 			'list' => 'protectedtitles',
 			'ptdir' => 'newer',
-			'ptstart' => $startDate,
 			'ptend' => $endDate,
 			'ptlimit' => 'max',
 			'ptprop' => 'userid|timestamp|expiry|comment|level',
 		];
+
+		if ( $startDate !== null ) {
+			$params['ptstart'] = $startDate;
+		}
 
 		$more = true;
 		$i = 0;

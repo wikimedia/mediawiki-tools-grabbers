@@ -12,6 +12,8 @@
  * @date 5 August 2019
  */
 
+use MediaWiki\MediaWikiServices;
+
 require_once 'includes/TextGrabber.php';
 
 class GrabNewText extends TextGrabber {
@@ -337,8 +339,6 @@ class GrabNewText extends TextGrabber {
 	 *     revisions that should be already in the database
 	 */
 	function processPage( $page, $start = null, $skipPrevious = true ) {
-		global $wgContentHandlerUseDB;
-
 		$pageID = $page['pageid'];
 		$pageTitle = null;
 		$pageDesignation = "id $pageID";
@@ -353,7 +353,7 @@ class GrabNewText extends TextGrabber {
 		$params = [
 			'prop' => 'info|revisions',
 			'rvlimit' => 'max',
-			'rvprop' => 'ids|flags|timestamp|user|userid|comment|content|tags',
+			'rvprop' => 'ids|flags|timestamp|user|userid|comment|content|tags|contentmodel',
 			'rvdir' => 'newer',
 			'rvend' => wfTimestamp( TS_ISO_8601, $this->endDate )
 		];
@@ -368,9 +368,6 @@ class GrabNewText extends TextGrabber {
 		}
 		if ( $page['protection'] ) {
 			$params['inprop'] = 'protection';
-		}
-		if ( $wgContentHandlerUseDB ) {
-			$params['rvprop'] = $params['rvprop'] . '|contentmodel';
 		}
 
 		$result = $this->bot->query( $params );
@@ -424,11 +421,12 @@ class GrabNewText extends TextGrabber {
 		$page_e['counter'] = ( isset( $info_pages[0]['counter'] ) ? $info_pages[0]['counter'] : 0 );
 		$page_e['latest'] = $info_pages[0]['lastrevid'];
 		$defaultModel = null;
-		if ( $wgContentHandlerUseDB && isset( $info_pages[0]['contentmodel'] ) ) {
+		if ( isset( $info_pages[0]['contentmodel'] ) ) {
 			# This would be the most accurate way of getting the content model for a page.
 			# However it calls hooks and can be incredibly slow or cause errors
 			#$defaultModel = ContentHandler::getDefaultModelFor( $title );
-			$defaultModel = MWNamespace::getNamespaceContentModel( $info_pages[0]['ns'] ) || CONTENT_MODEL_WIKITEXT;
+			$defaultModel = MediaWikiServices::getInstance()->getNamespaceInfo()->
+				getNamespaceContentModel( $info_pages[0]['ns'] ) || CONTENT_MODEL_WIKITEXT;
 			# Set only if not the default content model
 			if ( $defaultModel != $info_pages[0]['contentmodel'] ) {
 				$page_e['content_model'] = $info_pages[0]['contentmodel'];
@@ -570,20 +568,12 @@ class GrabNewText extends TextGrabber {
 	 * Copies revisions to archive and then deletes the page and revisions
 	 */
 	function archiveAndDeletePage( $pageID, $ns, $title ) {
-		global $wgActorTableSchemaMigrationStage, $wgContentHandlerUseDB;
+		global $wgActorTableSchemaMigrationStage;
 
 		# Get and insert revision data
 		# Most of this stuff comes from WikiPage::archiveRevisions()
 		$revQuery = $this->revisionStore->getQueryInfo();
 
-		if ( $wgActorTableSchemaMigrationStage & SCHEMA_COMPAT_WRITE_OLD ) {
-			$revQuery['fields'][] = 'rev_text_id';
-
-			if ( $wgContentHandlerUseDB ) {
-				$revQuery['fields'][] = 'rev_content_model';
-				$revQuery['fields'][] = 'rev_content_format';
-			}
-		}
 		$result = $this->dbw->select(
 			$revQuery['tables'],
 			$revQuery['fields'],
@@ -594,7 +584,6 @@ class GrabNewText extends TextGrabber {
 		);
 
 		$commentStore = CommentStore::getStore();
-		$actorMigration = ActorMigration::newMigration();
 		$revids = [];
 
 		foreach ( $result as $row ) {
@@ -606,6 +595,7 @@ class GrabNewText extends TextGrabber {
 			#$e['ar_comment'] = $row->rev_comment;
 			#$e['ar_user'] = $row->rev_user;
 			#$e['ar_user_text'] = $row->rev_user_text;
+			$e['ar_actor'] = $row->rev_actor;
 			$e['ar_timestamp'] = $row->rev_timestamp;
 			$e['ar_minor_edit'] = $row->rev_minor_edit;
 			$e['ar_rev_id'] = $row->rev_id;
@@ -616,18 +606,8 @@ class GrabNewText extends TextGrabber {
 			$e['ar_sha1'] = $row->rev_sha1;
 			#$e['ar_content_model'] = $row->rev_content_model;
 			#$e['ar_content_format'] = $row->rev_content_format;
-			if ( $wgActorTableSchemaMigrationStage & SCHEMA_COMPAT_WRITE_OLD ) {
-				$e['ar_text_id'] = $row->rev_text_id;
-
-				if ( $wgContentHandlerUseDB ) {
-					$e['ar_content_model'] = $row->rev_content_model;
-					$e['ar_content_format'] = $row->rev_content_format;
-				}
-			}
 			$comment = $commentStore->getComment( 'rev_comment', $row );
-			$user = User::newFromAnyId( $row->rev_user, $row->rev_user_text, $row->rev_actor );
 			$e += $commentStore->insert( $this->dbw, 'ar_comment', $comment );
-			$e += $actorMigration->getInsertValues( $this->dbw, 'ar_user', $user );
 
 			$this->dbw->insert( 'archive', $e, __METHOD__ );
 			$revids[] = $row->rev_id;
@@ -649,7 +629,7 @@ class GrabNewText extends TextGrabber {
 			[ 'revcomment_rev' => $revids ],
 			__METHOD__
 		);
-		if ( $wgActorTableSchemaMigrationStage & SCHEMA_COMPAT_WRITE_NEW ) {
+		if ( $wgActorTableSchemaMigrationStage & SCHEMA_COMPAT_WRITE_TEMP ) {
 			$this->dbw->delete(
 				'revision_actor_temp',
 				[ 'revactor_rev' => $revids ],
@@ -666,32 +646,28 @@ class GrabNewText extends TextGrabber {
 	}
 
 	function updateRestored( $ns, $title ) {
-		global $wgMultiContentRevisionSchemaMigrationStage;
-
-		if ( $wgMultiContentRevisionSchemaMigrationStage & SCHEMA_COMPAT_WRITE_NEW ) {
-			# We need to delete content from the slots table too, otherwise
-			# when we get the revisions from the remote wiki that already
-			# exist here, we'll get duplicate errors
-			$result = $this->dbw->select(
-				'archive',
-				[ 'ar_rev_id' ],
-				[
-					'ar_title' => $title,
-					'ar_namespace' => $ns
-				],
+		# We need to delete content from the slots table too, otherwise
+		# when we get the revisions from the remote wiki that already
+		# exist here, we'll get duplicate errors
+		$result = $this->dbw->select(
+			'archive',
+			[ 'ar_rev_id' ],
+			[
+				'ar_title' => $title,
+				'ar_namespace' => $ns
+			],
+			__METHOD__
+		);
+		$revids = [];
+		foreach ( $result as $row ) {
+			$revids[] = $row->ar_rev_id;
+		}
+		if ( $revids ) {
+			$this->dbw->delete(
+				'slots',
+				[ 'slot_revision_id' => $revids ],
 				__METHOD__
 			);
-			$revids = [];
-			foreach ( $result as $row ) {
-				$revids[] = $row->ar_rev_id;
-			}
-			if ( $revids ) {
-				$this->dbw->delete(
-					'slots',
-					[ 'slot_revision_id' => $revids ],
-					__METHOD__
-				);
-			}
 		}
 		# Delete existing deleted revisions for page
 		$this->dbw->delete(
