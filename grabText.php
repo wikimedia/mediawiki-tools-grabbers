@@ -202,7 +202,6 @@ class GrabText extends TextGrabber {
 		$page_e = [
 			'namespace' => null,
 			'title' => null,
-			'restrictions' => '',
 			'counter' => 0,
 			'is_redirect' => 0,
 			'is_new' => 0,
@@ -331,7 +330,6 @@ class GrabText extends TextGrabber {
 		$insert_fields = [
 			'page_namespace' => $page_e['namespace'],
 			'page_title' => $page_e['title'],
-			'page_restrictions' => $page_e['restrictions'],
 			'page_is_redirect' => $page_e['is_redirect'],
 			'page_is_new' => $page_e['is_new'],
 			'page_random' => $page_e['random'],
