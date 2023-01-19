@@ -279,7 +279,6 @@ class GrabText extends TextGrabber {
 						'type' => $prot['type'],
 						'level' => $prot['level'],
 						'cascade' => (int)isset( $prot['cascade'] ),
-						'user' => null,
 						'expiry' => ( $prot['expiry'] == 'infinity' ? 'infinity' : wfTimestamp( TS_MW, $prot['expiry'] ) )
 					];
 					$this->dbw->insert(
@@ -289,7 +288,6 @@ class GrabText extends TextGrabber {
 							'pr_type' => $e['type'],
 							'pr_level' => $e['level'],
 							'pr_cascade' => $e['cascade'],
-							'pr_user' => $e['user'],
 							'pr_expiry' => $e['expiry']
 						],
 						__METHOD__
