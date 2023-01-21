@@ -135,25 +135,10 @@ abstract class ExternalWikiGrabber extends Maintenance {
 			return $this->actorStore->getUnknownActor();
 		}
 
-		$q = [
-			'actor_user' => $id,
-			'actor_name' => $name,
-		];
+		$userIdentity = new UserIdentityValue( $id, $name );
+		$this->actorStore->acquireActorId( $userIdentity, $this->dbw );
 
-		$actor = (int)$this->dbw->selectField(
-			'actor',
-			'actor_id',
-			$q,
-			__METHOD__,
-			[ 'LOCK IN SHARE MODE' ]
-		);
-
-		if ( !$actor ) {
-			$this->dbw->insert( 'actor', $q, __METHOD__, [ 'IGNORE' ] );
-			$actor = (int)$this->dbw->insertId();
-		}
-
-		return new UserIdentityValue( $id, $name );
+		return $userIdentity;
 	}
 
 	/**
