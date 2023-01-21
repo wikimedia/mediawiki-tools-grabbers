@@ -156,7 +156,7 @@ abstract class TextGrabber extends ExternalWikiGrabber {
 		$rev->setTimestamp( $revision['timestamp'] );
 		$rev->setMinorEdit( isset( $revision['minor'] ) );
 		$userIdentity = $this->getUserIdentity( $revision['userid'], $revision['user'] );
-		$rev->setUser( User::newFromIdentity( $userIdentity ) );
+		$rev->setUser( $userIdentity );
 		$rev->setPageId( $page_id );
 		$rev->setParentId( $revision['parentid'] );
 		$this->revisionStore->insertRevisionOn( $rev, $this->dbw );
