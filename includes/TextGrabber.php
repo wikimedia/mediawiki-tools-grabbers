@@ -158,7 +158,13 @@ abstract class TextGrabber extends ExternalWikiGrabber {
 		$userIdentity = $this->getUserIdentity( $revision['userid'], $revision['user'] );
 		$rev->setUser( $userIdentity );
 		$rev->setPageId( $page_id );
-		$rev->setParentId( $revision['parentid'] );
+		# A null parent id should never happen, but some wikis coming from Gamepedia
+		# may have this as null on some pages automatically set up during wiki
+		# creation.
+		# Skipping this will calculate the parent id on revision insertion.
+		if ( isset( $revision['parentid'] ) ) {
+			$rev->setParentId( $revision['parentid'] );
+		}
 		$this->revisionStore->insertRevisionOn( $rev, $this->dbw );
 
 		# Insert tags, if any
