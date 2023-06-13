@@ -627,13 +627,6 @@ class GrabNewText extends TextGrabber {
 			[ 'revcomment_rev' => $revids ],
 			__METHOD__
 		);
-		if ( $wgActorTableSchemaMigrationStage & SCHEMA_COMPAT_WRITE_TEMP ) {
-			$this->dbw->delete(
-				'revision_actor_temp',
-				[ 'revactor_rev' => $revids ],
-				__METHOD__
-			);
-		}
 		# Also delete any restrictions
 		$this->dbw->delete(
 			'page_restrictions',
