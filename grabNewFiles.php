@@ -120,7 +120,13 @@ class GrabNewFiles extends FileGrabber {
 					}
 				}
 			}
-
+			
+				// rate limit
+				LOW=22;
+				HIGH=200;
+				INTERVAL=$[ $[ $RANDOM % $[ $HIGH-$LOW+1] ] + $LOW ];
+				sleep($INTERVAL);
+				
 			if ( isset( $result['query-continue'] ) && isset( $result['query-continue']['logevents'] ) ) {
 				$params = array_merge( $params, $result['query-continue']['logevents'] );
 			} elseif ( isset( $result['continue'] ) ) {

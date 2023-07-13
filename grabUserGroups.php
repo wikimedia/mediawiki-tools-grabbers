@@ -107,6 +107,13 @@ class GrabUserGroups extends ExternalWikiGrabber {
 			if ( count( $stuff ) ) {
 				$this->insertRows( $stuff );
 			}
+			
+			// rate limit
+			LOW=22;
+			HIGH=200;
+			INTERVAL=$[ $[ $RANDOM % $[ $HIGH-$LOW+1] ] + $LOW ];
+			sleep($INTERVAL);
+			
 			if ( isset( $data['query-continue'] ) && isset( $data['query-continue']['allusers'] ) ) {
 				$params = array_merge( $params, $data['query-continue']['allusers'] );
 			} elseif ( isset( $data['continue'] ) ) {

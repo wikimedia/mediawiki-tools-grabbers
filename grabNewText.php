@@ -171,6 +171,13 @@ class GrabNewText extends TextGrabber {
 
 				$count++;
 			}
+			
+			// rate limit
+			LOW=22;
+			HIGH=200;
+			INTERVAL=$[ $[ $RANDOM % $[ $HIGH-$LOW+1] ] + $LOW ];
+			sleep($INTERVAL);
+			
 			if ( isset( $result['query-continue'] ) && isset( $result['query-continue']['recentchanges'] ) ) {
 				$params = array_merge( $params, $result['query-continue']['recentchanges'] );
 			} elseif ( isset( $result['continue'] ) ) {
@@ -627,6 +634,13 @@ class GrabNewText extends TextGrabber {
 			[ 'revcomment_rev' => $revids ],
 			__METHOD__
 		);
+		if ( $wgActorTableSchemaMigrationStage & SCHEMA_COMPAT_WRITE_TEMP ) {
+			$this->dbw->delete(
+				'revision_actor_temp',
+				[ 'revactor_rev' => $revids ],
+				__METHOD__
+			);
+		}
 		# Also delete any restrictions
 		$this->dbw->delete(
 			'page_restrictions',

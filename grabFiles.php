@@ -70,6 +70,12 @@ class GrabFiles extends FileGrabber {
 				$count = $count + $this->processFile( $file );
 			}
 
+			// rate limit
+			LOW=22;
+			HIGH=200;
+			INTERVAL=$[ $[ $RANDOM % $[ $HIGH-$LOW+1] ] + $LOW ];
+			sleep($INTERVAL);
+			
 			if ( isset( $result['query-continue'] ) ) {
 				$gaifrom = $result['query-continue']['allimages']['gaifrom'];
 			} elseif ( isset( $result['continue'] ) ) {
@@ -77,6 +83,7 @@ class GrabFiles extends FileGrabber {
 			} else {
 				$more = false;
 			}
+		
 		}
 		$this->output( "$count files downloaded.\n" );
 	}

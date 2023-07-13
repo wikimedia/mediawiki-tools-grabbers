@@ -92,6 +92,13 @@ class GrabText extends TextGrabber {
 				}
 			}
 			$pageCount += $this->processPagesFromNamespace( (int)$ns, $continueTitle );
+			
+			// rate limit
+			LOW=22;
+			HIGH=200;
+			INTERVAL=$[ $[ $RANDOM % $[ $HIGH-$LOW+1] ] + $LOW ];
+			sleep($INTERVAL);
+
 		}
 		$this->output( "\nDone - found $pageCount total pages.\n" );
 		# Done.

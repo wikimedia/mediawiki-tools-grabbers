@@ -74,6 +74,12 @@ class GrabUserBlocks extends ExternalWikiGrabber {
 					$i++;
 				}
 
+				// rate limit
+				LOW=22;
+				HIGH=200;
+				INTERVAL=$[ $[ $RANDOM % $[ $HIGH-$LOW+1] ] + $LOW ];
+				sleep($INTERVAL);
+			
 				if ( isset( $result['query-continue'] ) && isset( $result['query-continue']['blocks'] ) ) {
 					$params = array_merge( $params, $result['query-continue']['blocks'] );
 					$this->output( "{$i} entries processed.\n" );
