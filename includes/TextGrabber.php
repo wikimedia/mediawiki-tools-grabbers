@@ -126,20 +126,13 @@ abstract class TextGrabber extends ExternalWikiGrabber {
 				$revision['userid'] = 0;
 			}
 		}
+		$comment = $revision['comment'] ?? '';
 		if ( isset( $revision['commenthidden'] ) ) {
 			$revdeleted = $revdeleted | RevisionRecord::DELETED_COMMENT;
-			$comment = ''; # edit summary removed
-		} else {
-			$comment = $revision['comment'];
-			if ( !$comment ) {
-				$comment = '';
-			}
 		}
+		$text = $revision['*'] ?? '';
 		if ( isset( $revision['texthidden'] ) ) {
 			$revdeleted = $revdeleted | RevisionRecord::DELETED_TEXT;
-			$text = ''; # This content has been removed.
-		} else {
-			$text = $revision['*'];
 		}
 		if ( isset ( $revision['suppressed'] ) ) {
 			$revdeleted = $revdeleted | RevisionRecord::DELETED_RESTRICTED;
