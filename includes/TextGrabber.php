@@ -61,6 +61,11 @@ abstract class TextGrabber extends ExternalWikiGrabber {
 	 */
 	protected $slotRoleStore = null;
 
+	/**
+	 * @var CommentStore
+	 */
+	protected $commentStore = null;
+
 	public function __construct() {
 		parent::__construct();
 		$this->addOption( 'enddate', 'End point (20121222142317, 2012-12-22T14:23:17, etc); defaults to current timestamp. May leave pages in inconsistent state if page moves are involved', false, true );
@@ -83,6 +88,7 @@ abstract class TextGrabber extends ExternalWikiGrabber {
 		$this->blobStore = $services->getBlobStore();
 		$this->contentModelStore = $services->getContentModelStore();
 		$this->slotRoleStore = $services->getSlotRoleStore();
+		$this->commentStore = $services->getCommentStore();
 
 		# Check if wiki supports page counters (removed from core in 1.25)
 		$this->supportsCounters = $this->dbw->fieldExists( 'page', 'page_counter', __METHOD__ );
@@ -219,8 +225,7 @@ abstract class TextGrabber extends ExternalWikiGrabber {
 		# This can probably break if user was suppressed and we don't have permissions to view it
 		$actor = $this->getActorFromUser( (int)$revision['userid'], $revision['user'] );
 
-		$commentStore = MediaWikiServices::getInstance()->getCommentStore();
-		$commentFields = $commentStore->insert( $this->dbw, 'ar_comment', $comment );
+		$commentFields = $this->commentStore->insert( $this->dbw, 'ar_comment', $comment );
 
 		$e = [
 			'ar_namespace' => $title->getNamespace(),

@@ -566,8 +566,6 @@ class GrabNewText extends TextGrabber {
 	 * Copies revisions to archive and then deletes the page and revisions
 	 */
 	function archiveAndDeletePage( $pageID, $ns, $title ) {
-		global $wgActorTableSchemaMigrationStage;
-
 		# Get and insert revision data
 		# Most of this stuff comes from WikiPage::archiveRevisions()
 		$revQuery = $this->revisionStore->getQueryInfo();
@@ -581,7 +579,6 @@ class GrabNewText extends TextGrabber {
 			$revQuery['joins']
 		);
 
-		$commentStore = CommentStore::getStore();
 		$revids = [];
 
 		foreach ( $result as $row ) {
@@ -604,8 +601,8 @@ class GrabNewText extends TextGrabber {
 			$e['ar_sha1'] = $row->rev_sha1;
 			#$e['ar_content_model'] = $row->rev_content_model;
 			#$e['ar_content_format'] = $row->rev_content_format;
-			$comment = $commentStore->getComment( 'rev_comment', $row );
-			$e += $commentStore->insert( $this->dbw, 'ar_comment', $comment );
+			$comment = $this->commentStore->getComment( 'rev_comment', $row );
+			$e += $this->commentStore->insert( $this->dbw, 'ar_comment', $comment );
 
 			$this->dbw->insert( 'archive', $e, __METHOD__ );
 			$revids[] = $row->rev_id;
