@@ -27,13 +27,6 @@ abstract class TextGrabber extends ExternalWikiGrabber {
 	protected $endDate;
 
 	/**
-	 * Whether our wiki supports page counters, to use counters if remote wiki also has them
-	 *
-	 * @var bool
-	 */
-	protected $supportsCounters;
-
-	/**
 	 * A list of page titles involved in moves, that need special treatment in deletes/restores
 	 *
 	 * @var array
@@ -96,9 +89,6 @@ abstract class TextGrabber extends ExternalWikiGrabber {
 		$this->contentModelStore = $services->getContentModelStore();
 		$this->slotRoleStore = $services->getSlotRoleStore();
 		$this->commentStore = $services->getCommentStore();
-
-		# Check if wiki supports page counters (removed from core in 1.25)
-		$this->supportsCounters = $this->dbw->fieldExists( 'page', 'page_counter', __METHOD__ );
 	}
 
 	/**

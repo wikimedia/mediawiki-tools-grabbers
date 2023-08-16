@@ -191,7 +191,6 @@ class GrabText extends TextGrabber {
 		$page_e = [
 			'namespace' => null,
 			'title' => null,
-			'counter' => 0,
 			'is_redirect' => 0,
 			'is_new' => 0,
 			'random' => wfRandom(),
@@ -212,7 +211,6 @@ class GrabText extends TextGrabber {
 		$page_e['is_redirect'] = ( isset( $info_pages[0]['redirect'] ) ? 1 : 0 );
 		$page_e['is_new'] = ( isset( $info_pages[0]['new'] ) ? 1 : 0 );
 		$page_e['len'] = $info_pages[0]['length'];
-		$page_e['counter'] = ( isset( $info_pages[0]['counter'] ) ? $info_pages[0]['counter'] : 0 );
 		$page_e['latest'] = $info_pages[0]['lastrevid'];
 		$defaultModel = null;
 		if ( isset( $info_pages[0]['contentmodel'] ) ) {
@@ -319,9 +317,6 @@ class GrabText extends TextGrabber {
 			'page_len' => $page_e['len'],
 			'page_content_model' => $page_e['content_model']
 		];
-		if ( $this->supportsCounters && $page_e['counter'] ) {
-			$insert_fields['page_counter'] = $page_e['counter'];
-		}
 		if ( !$pageIsPresent ) {
 			# insert if not present
 			$this->output( "Inserting page entry $pageID\n" );
