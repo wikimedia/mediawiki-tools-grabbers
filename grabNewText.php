@@ -61,13 +61,6 @@ class GrabNewText extends TextGrabber {
 	 */
 	protected $canSeeDeletedRevs = true;
 
-	/**
-	 * A list of page titles involved in moves, that need special treatment in deletes/restores
-	 *
-	 * @var array
-	 */
-	protected $movedTitles = [];
-
 	public function __construct() {
 		parent::__construct();
 		$this->mDescription = "Grab new changes from an external wiki and add it over an imported dump.\nFor use when the available dump is slightly out of date.";
@@ -560,77 +553,6 @@ class GrabNewText extends TextGrabber {
 			);
 		}
 		$this->dbw->commit();
-	}
-
-	/**
-	 * Copies revisions to archive and then deletes the page and revisions
-	 */
-	function archiveAndDeletePage( $pageID, $ns, $title ) {
-		# Get and insert revision data
-		# Most of this stuff comes from WikiPage::archiveRevisions()
-		$revQuery = $this->revisionStore->getQueryInfo();
-
-		$result = $this->dbw->select(
-			$revQuery['tables'],
-			$revQuery['fields'],
-			[ 'rev_page' => $pageID ],
-			__METHOD__,
-			[],
-			$revQuery['joins']
-		);
-
-		$revids = [];
-
-		foreach ( $result as $row ) {
-			$e = [
-				'ar_page_id' => $pageID,
-				'ar_namespace' => $ns,
-				'ar_title' => $title
-			];
-			#$e['ar_comment'] = $row->rev_comment;
-			#$e['ar_user'] = $row->rev_user;
-			#$e['ar_user_text'] = $row->rev_user_text;
-			$e['ar_actor'] = $row->rev_actor;
-			$e['ar_timestamp'] = $row->rev_timestamp;
-			$e['ar_minor_edit'] = $row->rev_minor_edit;
-			$e['ar_rev_id'] = $row->rev_id;
-			#$e['ar_text_id'] = $row->rev_text_id;
-			$e['ar_deleted'] = $row->rev_deleted;
-			$e['ar_len'] = $row->rev_len;
-			$e['ar_parent_id'] = $row->rev_parent_id;
-			$e['ar_sha1'] = $row->rev_sha1;
-			#$e['ar_content_model'] = $row->rev_content_model;
-			#$e['ar_content_format'] = $row->rev_content_format;
-			$comment = $this->commentStore->getComment( 'rev_comment', $row );
-			$e += $this->commentStore->insert( $this->dbw, 'ar_comment', $comment );
-
-			$this->dbw->insert( 'archive', $e, __METHOD__ );
-			$revids[] = $row->rev_id;
-		}
-
-		# Delete page and revision entries
-		$this->dbw->delete(
-			'page',
-			[ 'page_id' => $pageID ],
-			__METHOD__
-		);
-		$this->dbw->delete(
-			'revision',
-			[ 'rev_page' => $pageID ],
-			__METHOD__
-		);
-		$this->dbw->delete(
-			'revision_comment_temp',
-			[ 'revcomment_rev' => $revids ],
-			__METHOD__
-		);
-		# Also delete any restrictions
-		$this->dbw->delete(
-			'page_restrictions',
-			[ 'pr_page' => $pageID ],
-			__METHOD__
-		);
-		# Full clean up in general database rebuild.
 	}
 
 	function updateRestored( $ns, $title ) {
