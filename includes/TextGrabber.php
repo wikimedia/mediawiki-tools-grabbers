@@ -34,6 +34,13 @@ abstract class TextGrabber extends ExternalWikiGrabber {
 	protected $movedTitles = [];
 
 	/**
+	 * Whether the local wiki uses revision_comment_temp
+	 *
+	 * @var bool
+	 */
+	protected $revTempCommentTable;
+
+	/**
 	 * Instance of the RevisionStore service
 	 *
 	 * @var RevisionStore
@@ -89,6 +96,8 @@ abstract class TextGrabber extends ExternalWikiGrabber {
 		$this->contentModelStore = $services->getContentModelStore();
 		$this->slotRoleStore = $services->getSlotRoleStore();
 		$this->commentStore = $services->getCommentStore();
+
+		$this->revTempCommentTable = $this->dbw->tableExists( 'revision_comment_temp', __METHOD__ );
 	}
 
 	/**
@@ -227,9 +236,6 @@ abstract class TextGrabber extends ExternalWikiGrabber {
 		$e = [
 			'ar_namespace' => $title->getNamespace(),
 			'ar_title' => $title->getDBkey(),
-			#'ar_comment' => $comment,
-			#'ar_user' => $revision['userid'],
-			#'ar_user_text' => $revision['user'],
 			'ar_actor' => $actor,
 			'ar_timestamp' => $timestamp,
 			'ar_minor_edit' => ( isset( $revision['minor'] ) ? 1 : 0 ),
@@ -237,7 +243,7 @@ abstract class TextGrabber extends ExternalWikiGrabber {
 			'ar_deleted' => $revdeleted,
 			'ar_len' => strlen( $text ),
 			'ar_sha1' => SlotRecord::base36Sha1( $text ),
-			#'ar_page_id' => NULL, # Not requred and unreliable from api
+			#'ar_page_id' => NULL, # Not required and unreliable from api
 			'ar_parent_id' => $parentID,
 		] + $commentFields;
 
@@ -420,26 +426,20 @@ abstract class TextGrabber extends ExternalWikiGrabber {
 
 		$revids = [];
 
+		$e = [
+			'ar_page_id' => $pageID,
+			'ar_namespace' => $ns,
+			'ar_title' => $title
+		];
 		foreach ( $result as $row ) {
-			$e = [
-				'ar_page_id' => $pageID,
-				'ar_namespace' => $ns,
-				'ar_title' => $title
-			];
-			#$e['ar_comment'] = $row->rev_comment;
-			#$e['ar_user'] = $row->rev_user;
-			#$e['ar_user_text'] = $row->rev_user_text;
 			$e['ar_actor'] = $row->rev_actor;
 			$e['ar_timestamp'] = $row->rev_timestamp;
 			$e['ar_minor_edit'] = $row->rev_minor_edit;
 			$e['ar_rev_id'] = $row->rev_id;
-			#$e['ar_text_id'] = $row->rev_text_id;
 			$e['ar_deleted'] = $row->rev_deleted;
 			$e['ar_len'] = $row->rev_len;
 			$e['ar_parent_id'] = $row->rev_parent_id;
 			$e['ar_sha1'] = $row->rev_sha1;
-			#$e['ar_content_model'] = $row->rev_content_model;
-			#$e['ar_content_format'] = $row->rev_content_format;
 			$comment = $this->commentStore->getComment( 'rev_comment', $row );
 			$e += $this->commentStore->insert( $this->dbw, 'ar_comment', $comment );
 
@@ -458,11 +458,13 @@ abstract class TextGrabber extends ExternalWikiGrabber {
 			[ 'rev_page' => $pageID ],
 			__METHOD__
 		);
-		$this->dbw->delete(
-			'revision_comment_temp',
-			[ 'revcomment_rev' => $revids ],
-			__METHOD__
-		);
+		if ( $this->revTempCommentTable ) {
+			$this->dbw->delete(
+				'revision_comment_temp',
+				[ 'revcomment_rev' => $revids ],
+				__METHOD__
+			);
+		}
 		# Also delete any restrictions
 		$this->dbw->delete(
 			'page_restrictions',
