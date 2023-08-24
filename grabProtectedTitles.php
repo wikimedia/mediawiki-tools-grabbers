@@ -15,13 +15,6 @@ require_once 'includes/ExternalWikiGrabber.php';
 
 class GrabProtectedTitles extends ExternalWikiGrabber {
 
-	/**
-	 * MediaWikiBot instance
-	 *
-	 * @var MediaWikiBot
-	 */
-	protected $bot;
-
 	public function __construct() {
 		parent::__construct();
 		$this->mDescription = 'Grabs protected titles from a pre-existing wiki into a new wiki.';
@@ -93,7 +86,7 @@ class GrabProtectedTitles extends ExternalWikiGrabber {
 	public function processEntry( $entry ) {
 		$ts = wfTimestamp( TS_MW, $entry['timestamp'] );
 
-		$commentFields = CommentStore::getStore()->insert( $this->dbw, 'pt_reason', $entry['comment'] );
+		$commentFields = $this->commentStore->insert( $this->dbw, 'pt_reason', $entry['comment'] );
 
 		$data = [
 			'pt_namespace' => $entry['ns'],

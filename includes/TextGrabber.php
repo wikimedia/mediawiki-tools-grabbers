@@ -68,11 +68,6 @@ abstract class TextGrabber extends ExternalWikiGrabber {
 	 */
 	protected $slotRoleStore = null;
 
-	/**
-	 * @var CommentStore
-	 */
-	protected $commentStore = null;
-
 	public function __construct() {
 		parent::__construct();
 		$this->addOption( 'enddate', 'End point (20121222142317, 2012-12-22T14:23:17, etc); defaults to current timestamp. May leave pages in inconsistent state if page moves are involved', false, true );
@@ -95,7 +90,6 @@ abstract class TextGrabber extends ExternalWikiGrabber {
 		$this->blobStore = $services->getBlobStore();
 		$this->contentModelStore = $services->getContentModelStore();
 		$this->slotRoleStore = $services->getSlotRoleStore();
-		$this->commentStore = $services->getCommentStore();
 
 		$this->revTempCommentTable = $this->dbw->tableExists( 'revision_comment_temp', __METHOD__ );
 	}

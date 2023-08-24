@@ -204,7 +204,7 @@ class GrabLogs extends ExternalWikiGrabber {
 		}
 
 		# Bits of code picked from ManualLogEntry::insert()
-		$e += CommentStore::getStore()->insert( $this->dbw, 'log_comment', $entry['comment'] );
+		$e += $this->commentStore->insert( $this->dbw, 'log_comment', $entry['comment'] );
 
 		$this->dbw->insert( 'logging', $e, __METHOD__ );
 

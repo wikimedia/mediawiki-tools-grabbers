@@ -38,6 +38,11 @@ abstract class ExternalWikiGrabber extends Maintenance {
 	 */
 	private $actorStore;
 
+	/**
+	 * @var CommentStore
+	 */
+	protected $commentStore = null;
+
 	public function __construct() {
 		parent::__construct();
 		$this->addOption( 'url', 'URL to the target wiki\'s api.php', true /* required? */, true /* withArg */, 'u' );
@@ -86,7 +91,9 @@ abstract class ExternalWikiGrabber extends Maintenance {
 		# Get a single DB_MASTER connection
 		$this->dbw = wfGetDB( DB_MASTER, [], $this->getOption( 'db', $wgDBname ) );
 
-		$this->actorStore = MediaWikiServices::getInstance()->getActorStore();
+		$services = MediaWikiServices::getInstance();
+		$this->actorStore = $services->getActorStore();
+		$this->commentStore = $services->getCommentStore();
 	}
 
 	/**
