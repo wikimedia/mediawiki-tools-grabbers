@@ -426,24 +426,28 @@ abstract class TextGrabber extends ExternalWikiGrabber {
 
 		$revids = [];
 
-		$e = [
+		$insertFields = [
 			'ar_page_id' => $pageID,
 			'ar_namespace' => $ns,
 			'ar_title' => $title
 		];
 		foreach ( $result as $row ) {
-			$e['ar_actor'] = $row->rev_actor;
-			$e['ar_timestamp'] = $row->rev_timestamp;
-			$e['ar_minor_edit'] = $row->rev_minor_edit;
-			$e['ar_rev_id'] = $row->rev_id;
-			$e['ar_deleted'] = $row->rev_deleted;
-			$e['ar_len'] = $row->rev_len;
-			$e['ar_parent_id'] = $row->rev_parent_id;
-			$e['ar_sha1'] = $row->rev_sha1;
-			$comment = $this->commentStore->getComment( 'rev_comment', $row );
-			$e += $this->commentStore->insert( $this->dbw, 'ar_comment', $comment );
+			$insertFields['ar_actor'] = $row->rev_actor;
+			$insertFields['ar_timestamp'] = $row->rev_timestamp;
+			$insertFields['ar_minor_edit'] = $row->rev_minor_edit;
+			$insertFields['ar_rev_id'] = $row->rev_id;
+			$insertFields['ar_deleted'] = $row->rev_deleted;
+			$insertFields['ar_len'] = $row->rev_len;
+			$insertFields['ar_parent_id'] = $row->rev_parent_id;
+			$insertFields['ar_sha1'] = $row->rev_sha1;
 
-			$this->dbw->insert( 'archive', $e, __METHOD__ );
+			$comment = $this->commentStore->getComment( 'rev_comment', $row );
+			$insertFields = array_merge(
+				$insertFields,
+				$this->commentStore->insert( $this->dbw, 'ar_comment', $comment )
+			);
+
+			$this->dbw->insert( 'archive', $insertFields, __METHOD__ );
 			$revids[] = $row->rev_id;
 		}
 
