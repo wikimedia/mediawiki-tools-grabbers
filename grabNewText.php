@@ -442,7 +442,7 @@ class GrabNewText extends TextGrabber {
 			$conflictingPageID = $this->getPageID( $page_e['namespace'], $page_e['title'] );
 			if ( $conflictingPageID ) {
 				# Whoops...
-				$this->resolveConflictingTitle( $conflictingPageID, $page_e['namespace'], $page_e['title'] );
+				$this->resolveConflictingTitle( $page_e['namespace'], $page_e['title'], $pageID, $conflictingPageID );
 			}
 		}
 
@@ -712,7 +712,7 @@ class GrabNewText extends TextGrabber {
 				$conflictingPageID = $this->getPageID( $remotePageNs, $remotePageTitle );
 				if ( $conflictingPageID ) {
 					# Whoops...
-					$this->resolveConflictingTitle( $conflictingPageID, $remotePageNs, $remotePageTitle );
+					$this->resolveConflictingTitle( $remotePageNs, $remotePageTitle, $pageID, $conflictingPageID );
 				}
 				$this->output( sprintf( "Page ID $pageID has been moved on remote wiki. Moving $sourceTitle to %s...\n",
 					Title::makeTitle( $remotePageNs, $remotePageTitle ) ) );

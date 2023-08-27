@@ -244,7 +244,7 @@ class GrabText extends TextGrabber {
 			$conflictingPageID = $this->getPageID( $page_e['namespace'], $page_e['title'] );
 			if ( $conflictingPageID ) {
 				# Whoops...
-				$this->resolveConflictingTitle( $conflictingPageID, $page_e['namespace'], $page_e['title'] );
+				$this->resolveConflictingTitle( $page_e['namespace'], $page_e['title'], $pageID, $conflictingPageID );
 			}
 		}
 

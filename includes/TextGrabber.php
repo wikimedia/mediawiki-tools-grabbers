@@ -303,21 +303,24 @@ abstract class TextGrabber extends ExternalWikiGrabber {
 	 * page ID on the remote wiki.
 	 * If local page id doesn't exist on remote, delete (and archive) local page
 	 * since it must have been deleted. If it exists (in this case with different
-	 * title) then move it to where it belongs
+	 * title) then move it to where it belongs.
 	 *
-	 * @param int $conflictingPageID page ID with different title on local
-	 *     and remote wiki
-	 * @param int $remoteNs Namespace number of remote title for page id
-	 * @param string $remoteTitle remote title for page id
-	 * @param int $initialConflict optional - original conflicting ID to avoid
-	 *     endless loops if pages were moved in round
+	 * @param int $namespace Namespace number of the conflicting page
+	 * @param string $title Ttile (dbkey) of the conflicting page
+	 * @param int $remotePageID The remote page ID with the given title
+	 * @param int $conflictingPageID The existing local page ID with the given title
+	 * @param int $initialConflict optional - original conflicting local page ID
+	 *     to avoid endless loops if pages were moved in round
 	 * @return object A page object retrieved from database if an endless loop is
 	 *     detected, used internally on recursive calls
 	 */
-	function resolveConflictingTitle( $conflictingPageID, $remoteNs, $remoteTitle, $initialConflict = 0 ) {
+	function resolveConflictingTitle( $namespace, $title, $remotePageID, $conflictingPageID, $initialConflict = 0 ) {
 		$pageObj = null;
-		$pageTitle = Title::makeTitle( $remoteNs, $remoteTitle );
-		$this->output( "Warning: remote page ID $conflictingPageID has conflicting title $pageTitle with existing local page ID $conflictingPageID. Attempting to fix it...\n" );
+		$pageTitle = Title::makeTitle( $namespace, $title );
+		$this->output(
+			"Warning: remote page ID $remotePageID has conflicting title $pageTitle with "
+			"existing local page ID $conflictingPageID. Attempting to fix it...\n"
+		);
 		if ( !in_array( (string)$pageTitle, $this->movedTitles ) ) {
 			$this->movedTitles[] = (string)$pageTitle;
 		}
@@ -336,7 +339,7 @@ abstract class TextGrabber extends ExternalWikiGrabber {
 			# Delete our copy, move revisions to archive
 			# NOTE: If page was moved on remote wiki before deleting, we may potentially
 			# leave revisions in archive with wrong title.
-			$this->archiveAndDeletePage( $conflictingPageID, $remoteNs, $remoteTitle );
+			$this->archiveAndDeletePage( $conflictingPageID, $namespace, $title );
 		} else {
 			# Move page, but check first that the target title doesn't exist on local to avoid a conflict
 			$resultingNs = $info_pages[0]['ns'];
