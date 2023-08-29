@@ -226,21 +226,21 @@ class GrabText extends TextGrabber {
 		}
 
 		# Check if page is present
-		$pageIsPresent = false;
-		$rowCount = $this->dbw->selectRowCount(
+		$pageRow = $this->dbw->selectRow(
 			'page',
-			'page_id',
+			[ 'page_namespace', 'page_title' ],
 			[ 'page_id' => $pageID ],
 			__METHOD__
 		);
-		if ( $rowCount ) {
-			$pageIsPresent = true;
-		}
 
 		# If page is not present, check if title is present, because we can't insert
 		# a duplicate title. That would mean the page was moved leaving a redirect but
 		# we haven't processed the move yet
-		if ( !$pageIsPresent ) {
+		# Also, check the destination title before moving the page
+		if ( $pageRow === false ||
+			$pageRow->page_namespace != $page_e['namespace'] ||
+			$pageRow->page_title != $page_e['title']
+		) {
 			$conflictingPageID = $this->getPageID( $page_e['namespace'], $page_e['title'] );
 			if ( $conflictingPageID ) {
 				# Whoops...
@@ -317,7 +317,7 @@ class GrabText extends TextGrabber {
 			'page_len' => $page_e['len'],
 			'page_content_model' => $page_e['content_model']
 		];
-		if ( !$pageIsPresent ) {
+		if ( $pageRow === false ) {
 			# insert if not present
 			$this->output( "Inserting page entry $pageID\n" );
 			$insert_fields['page_id'] = $pageID;
