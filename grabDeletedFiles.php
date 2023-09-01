@@ -14,7 +14,7 @@ require_once __DIR__ . '/../maintenance/Maintenance.php';
 require_once 'includes/mediawikibot.class.php';
 require_once 'includes/mediawikibotHacks.php';
 
-class GrabDeletedFiles extends Maintenance {
+class GrabDeletedFiles extends FileGrabber {
 
 	# I GUESS WE NEED THESE THINGS HERE OR SOMETHING
 	# AAAAAAAAAAAAAAAAAGH
@@ -26,13 +26,9 @@ class GrabDeletedFiles extends Maintenance {
 	public function __construct() {
 		parent::__construct();
 		$this->mDescription = 'Grabs deleted files from a pre-existing wiki into a new wiki.';
-		$this->addOption( 'url', 'URL to the target wiki\'s api.php', true /* required? */, true /* withArg */, 'u' );
 		$this->addOption( 'imagesurl', 'URL to the target wiki\'s images directory', false, true, 'i' );
 		$this->addOption( 'scrape', 'Use screenscraping instead of the API?'
 			. ' (note: you don\'t want to do this unless you really have to.)', false, false, 's' );
-		$this->addOption( 'username', 'Username to log into the target wiki', true, true, 'n' );
-		$this->addOption( 'password', 'Password on the target wiki', true, true, 'p' );
-		$this->addOption( 'db', 'Database name, if we don\'t want to write to $wgDBname', false, true );
 		$this->addOption( 'fafrom', 'Start point from which to continue with metadata.', false, true, 'start' );
 		$this->addOption( 'skipmetadata', 'If you\'ve already populated oldarchive and just need to resume file downloads,'
 			. ' use this to avoid duplicating the metadata db entries', false, false, 'm' );
@@ -45,9 +41,6 @@ class GrabDeletedFiles extends Maintenance {
 		$url = $this->getOption( 'url' );
 		$imagesurl = $this->getOption( 'imagesurl' );
 		$scrape = $this->hasOption( 'scrape' );
-		if ( !$url ) {
-			$this->fatalError( 'The URL to the target wiki\'s api.php is required.' );
-		}
 		if ( !$imagesurl && !$scrape ) {
 			$this->fatalError( 'Unless we\'re screenscraping it, the URL to the target wiki\'s images directory is required.' );
 		}
@@ -59,19 +52,21 @@ class GrabDeletedFiles extends Maintenance {
 
 		$this->output( "Working...\n" );
 
-		# bot class and log in
-		$this->bot = new MediaWikiBotHacked(
-			$url,
-			'json',
-			$this->user,
-			$password,
-			'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:13.0) Gecko/20100101 Firefox/13.0.1'
-		);
-		if ( !$this->bot->login() ) {
-			$this->output( "Logged in as {$this->user}...\n" );
-			$this->lastLogin = time();
-		} else {
-			$this->fatalError( "Failed to log in as {$this->user}." );
+		if ( $scrape ) {
+			// If we're screenscraping, we need to use a different instance of MediaWikiBot.
+			$this->bot = new MediaWikiBotHacked(
+				$url,
+				'json',
+				$this->user,
+				$password,
+				'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:13.0) Gecko/20100101 Firefox/13.0.1'
+			);
+			if ( !$this->bot->login() ) {
+				$this->output( "Logged in as {$this->user}...\n" );
+				$this->lastLogin = time();
+			} else {
+				$this->fatalError( "Failed to log in as {$this->user}." );
+			}
 		}
 
 		$skipMetaData = $this->hasOption( 'skipmetadata' );
@@ -297,7 +292,11 @@ class GrabDeletedFiles extends Maintenance {
 	}
 
 	function processFile( $entry ) {
-		global $wgDBname;
+		$comment = $entry['description'] ?? '';
+
+		$actor = $this->getActorFromUser( (int)$entry['userid'], $entry['user'] );
+
+		$commentFields = $this->commentStore->insert( $this->dbw, 'fa_description', $comment );
 
 		$e = [
 			'fa_name' => $entry['name'],
@@ -305,14 +304,12 @@ class GrabDeletedFiles extends Maintenance {
 			'fa_width' => $entry['width'],
 			'fa_height' => $entry['height'],
 			'fa_bits' => $entry['bitdepth'],
-			'fa_description' => $entry['description'],
-			'fa_user' => $entry['userid'],
-			'fa_user_text' => $entry['user'],
+			'fa_actor' => $actor,
 			'fa_timestamp' => wfTimestamp( TS_MW, $entry['timestamp'] ),
 			'fa_storage_group' => 'deleted',
 			'fa_media_type' => null,
 			'fa_deleted' => 0
-		];
+		] + $commentFields;
 
 		$mime = $entry['mime'];
 		$mimeBreak = strpos( $mime, '/' );
@@ -336,13 +333,11 @@ class GrabDeletedFiles extends Maintenance {
 		# We could get these other fields from logging, but they appear to have no purpose so SCREW IT.
 		$e['fa_deleted_user'] = 0;
 		$e['fa_deleted_timestamp'] = null;
-		$e['fa_deleted_reason'] = null;
+		$e['fa_deleted_reason_id'] = 0;
 		$e['fa_archive_name'] = null; # UN:N; MediaWiki figures it out anyway.
 
-		$dbw = wfGetDB( DB_MASTER, [], $this->getOption( 'db', $wgDBname ) );
-
 		// Avoid adding duplicate entries.
-		$row = $dbw->selectRow(
+		$row = $this->dbw->selectRow(
 			'filearchive',
 			[
 				'1',
@@ -351,7 +346,7 @@ class GrabDeletedFiles extends Maintenance {
 			__METHOD__
 		);
 		if ( !$row ) {
-			$dbw->insert( 'filearchive', $e, __METHOD__ );
+			$this->dbw->insert( 'filearchive', $e, __METHOD__ );
 		}
 
 		# $this->output( "Changes committed to the database!\n" );
