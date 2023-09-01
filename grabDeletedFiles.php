@@ -341,7 +341,18 @@ class GrabDeletedFiles extends Maintenance {
 
 		$dbw = wfGetDB( DB_MASTER, [], $this->getOption( 'db', $wgDBname ) );
 
-		$dbw->insert( 'filearchive', $e, __METHOD__ );
+		// Avoid adding duplicate entries.
+		$row = $dbw->selectRow(
+			'filearchive',
+			[
+				'1',
+			],
+			$e,
+			__METHOD__
+		);
+		if ( !$row ) {
+			$dbw->insert( 'filearchive', $e, __METHOD__ );
+		}
 
 		# $this->output( "Changes committed to the database!\n" );
 	}
