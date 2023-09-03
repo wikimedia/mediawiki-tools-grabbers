@@ -240,6 +240,22 @@ class GrabLogs extends ExternalWikiGrabber {
 			$explicitParams = $entry[$entry['type']];
 		}
 		if ( !is_null( $explicitParams ) && count( $explicitParams ) > 0 ) {
+			# Since MediaWiki 1.25, legacy plain text format is also
+			# returned as an array inside the params object, with
+			# numeric keys. Detect this case to use the legacy format.
+			if ( count( $explicitParams ) == count( array_filter(
+				$explicitParams,
+				function( $key ) { return is_numeric( $key ); }, ARRAY_FILTER_USE_KEY ) )
+			) {
+				$index = 0;
+				$lines = [];
+				while ( isset( $explicitParams[(string)$index] ) ) {
+					$lines[] = $explicitParams[(string)$index];
+					$index++;
+				}
+				return $encodedParams = implode( "\n", $lines );
+			}
+
 			# Api does some transformations to array parameters, we need to encode
 			# them again to store them in database.
 			# This sucks horribly.
@@ -366,22 +382,6 @@ class GrabLogs extends ExternalWikiGrabber {
 					}
 					break;
 				default:
-					# Since MediaWiki 1.25, legacy plain text format is also
-					# returned as an array inside the params object, with
-					# numeric keys. Detect this case to use the legacy format.
-					if ( count( $explicitParams ) == count( array_filter(
-						$explicitParams,
-						function( $key ) { return is_numeric( $key ); } ) )
-					)
-					{
-						$index = 0;
-						$lines = [];
-						while ( isset( $entry[(string)$index] ) ) {
-							$lines[] = $entry[(string)$index];
-							$index++;
-						}
-						return $encodedParams = implode( "\n", $lines );
-					}
 					# Otherwise just pass through...
 					# It may insert parameters using the wrong format if they
 					# provide custom formatters, since we're not aware of them
