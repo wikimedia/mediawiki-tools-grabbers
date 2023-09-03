@@ -155,7 +155,13 @@ abstract class ExternalWikiGrabber extends Maintenance {
 	 * @param string $name User name or IP address
 	 */
 	function getActorFromUser( $id, $name ) {
-		return $this->actorStore->acquireActorId( new UserIdentityValue( $id, $name ), $this->dbw );
+		if ( empty( $name ) ) {
+			$user = $this->actorStore->getUnknownActor();
+		} else {
+			$user = new UserIdentityValue( $id, $name );
+		}
+
+		return $this->actorStore->acquireActorId( $user, $this->dbw );
 	}
 
 	/**

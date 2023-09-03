@@ -222,7 +222,6 @@ abstract class TextGrabber extends ExternalWikiGrabber {
 			$revdeleted = $revdeleted | RevisionRecord::DELETED_RESTRICTED;
 		}
 
-		# This can probably break if user was suppressed and we don't have permissions to view it
 		$actor = $this->getActorFromUser( (int)$revision['userid'], $revision['user'] );
 
 		$commentFields = $this->commentStore->insert( $this->dbw, 'ar_comment', $comment );
@@ -318,7 +317,7 @@ abstract class TextGrabber extends ExternalWikiGrabber {
 		$pageObj = null;
 		$pageTitle = Title::makeTitle( $namespace, $title );
 		$this->output(
-			"Warning: remote page ID $remotePageID has conflicting title $pageTitle with "
+			"Warning: remote page ID $remotePageID has conflicting title $pageTitle with " .
 			"existing local page ID $conflictingPageID. Attempting to fix it...\n"
 		);
 		if ( !in_array( (string)$pageTitle, $this->movedTitles ) ) {
