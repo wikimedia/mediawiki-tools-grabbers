@@ -367,11 +367,12 @@ class GrabLogs extends ExternalWikiGrabber {
 					}
 					break;
 				case 'upload':
-					$unserializedParams = $this->mapToTransformations(
-							$explicitParams,
-							[ 'img_sha1' ],
-							[ 'img_timestamp' ]
-						);
+					if ( isset( $explicitParams['img_sha1'] ) ) {
+						$unserializedParams['img_sha1'] = $explicitParams['img_sha1'];
+					}
+					if ( isset( $explicitParams['img_timestamp'] ) ) {
+						$unserializedParams['img_timestamp'] = wfTimestamp( TS_MW, $explicitParams['img_timestamp'] );
+					}
 					break;
 				case 'merge':
 					if ( isset( $explicitParams['dest_title'] ) ) {
@@ -467,7 +468,7 @@ class GrabLogs extends ExternalWikiGrabber {
 	}
 
 	/**
-	 * Pass an array containing associative arrays, creating a new array with
+	 * Pass an array *containing* associative arrays, creating a new array with
 	 * transformations defined by parameters. Keys not defined in parameters
 	 * won't be copied.
 	 *
