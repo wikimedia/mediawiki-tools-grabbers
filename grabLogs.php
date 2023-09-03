@@ -381,6 +381,56 @@ class GrabLogs extends ExternalWikiGrabber {
 						$unserializedParams['5::mergepoint'] = wfTimestamp( TS_MW, $explicitParams['mergepoint'] );
 					}
 					break;
+				case 'contentmodel':
+					if ( isset( $explicitParams['oldmodel'] ) ) {
+						$unserializedParams['4::oldmodel'] = $explicitParams['oldmodel'];
+					}
+					if ( isset( $explicitParams['newmodel'] ) ) {
+						$unserializedParams['5::newmodel'] = $explicitParams['newmodel'];
+					}
+					break;
+				case 'tag':
+					if ( isset( $explicitParams['revid'] ) ) {
+						$unserializedParams['4::revid'] = $explicitParams['revid'];
+					}
+					if ( isset( $explicitParams['logid'] ) ) {
+						$unserializedParams['5::logid'] = $explicitParams['logid'];
+					}
+					if ( isset( $explicitParams['tagsAdded'] ) ) {
+						$unserializedParams['6:list:tagsAdded'] = $explicitParams['tagsAdded'];
+					}
+					if ( isset( $explicitParams['tagsAddedCount'] ) ) {
+						$unserializedParams['7:number:tagsAddedCount'] = $explicitParams['tagsAddedCount'];
+					}
+					if ( isset( $explicitParams['tagsRemoved'] ) ) {
+						$unserializedParams['8:list:tagsRemoved'] = $explicitParams['tagsRemoved'];
+					}
+					if ( isset( $explicitParams['tagsRemovedCount'] ) ) {
+						$unserializedParams['9:number:tagsRemovedCount'] = $explicitParams['tagsRemovedCount'];
+					}
+					if ( isset( $explicitParams['initialTags'] ) ) {
+						$unserializedParams['initialTags'] = $explicitParams['initialTags'];
+					}
+					break;
+				case 'managetags':
+					if ( isset( $explicitParams['tag'] ) ) {
+						$unserializedParams['4::tag'] = $explicitParams['tag'];
+					}
+					if ( isset( $explicitParams['count'] ) ) {
+						$unserializedParams['5:number:count'] = $explicitParams['count'];
+					}
+					break;
+				case 'renameuser':
+					if ( isset( $explicitParams['olduser'] ) ) {
+						$unserializedParams['4::olduser'] = $explicitParams['olduser'];
+					}
+					if ( isset( $explicitParams['newuser'] ) ) {
+						$unserializedParams['5::newuser'] = $explicitParams['newuser'];
+					}
+					if ( isset( $explicitParams['edits'] ) ) {
+						$unserializedParams['6::edits'] = $explicitParams['edits'];
+					}
+					break;
 				default:
 					# Otherwise just pass through...
 					# It may insert parameters using the wrong format if they
