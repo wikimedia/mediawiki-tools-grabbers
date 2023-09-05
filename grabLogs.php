@@ -310,7 +310,7 @@ class GrabLogs extends ExternalWikiGrabber {
 						$unserializedParams['oldmetadata'] = $this->mapToTransformations(
 							$explicitParams['oldmetadata'],
 							[],
-							[ 'expiry' ]
+							[ 'expiry' => null ]
 						);
 					}
 					if ( isset( $explicitParams['newmetadata'] ) ) {
@@ -318,7 +318,7 @@ class GrabLogs extends ExternalWikiGrabber {
 						$unserializedParams['newmetadata'] = $this->mapToTransformations(
 							$explicitParams['newmetadata'],
 							[],
-							[ 'expiry' ]
+							[ 'expiry' => null ]
 						);
 					}
 					break;
@@ -338,13 +338,17 @@ class GrabLogs extends ExternalWikiGrabber {
 				case 'protect':
 					if ( isset( $explicitParams['description'] ) ) {
 						$unserializedParams['4::description'] = $explicitParams['description'];
+					} elseif ( isset( $explicitParams['oldtitle_title'] ) ) {
+						$unserializedParams['4::oldtitle'] = Title::makeTitle(
+							$explicitParams['oldtitle_ns'], $explicitParams['oldtitle_title']
+						)->getPrefixedDBKey();
 					}
 					$unserializedParams['5:bool:cascade'] = isset( $explicitParams['cascade'] );
 					if ( isset( $explicitParams['details'] ) ) {
 						$unserializedParams['details'] = $this->mapToTransformations(
 								$explicitParams['details'],
 								[ 'type', 'level' ],
-								[ 'expiry' ],
+								[ 'expiry' => 'infinite' ],
 								[ 'cascade' ]
 							);
 					}
@@ -475,7 +479,8 @@ class GrabLogs extends ExternalWikiGrabber {
 	 * @param array $origin Array containing the associative arrays
 	 *        to transform.
 	 * @param array $passThroughKeys List of keys that will be copied unmodified.
-	 * @param array $timestampKeys List of keys to be transformed as timestamps
+	 * @param array $timestampKeys Associative array of key => infinity pairs
+	 *        to be transformed as timestamps.
 	 * @param array $booleanKeys List of keys to be transformed as booleans
 	 * @return array Modified array
 	 */
@@ -487,10 +492,11 @@ class GrabLogs extends ExternalWikiGrabber {
 					$result[$key] = $item[$key];
 				}
 			}
-			foreach ( $timestampKeys as $key ) {
+			foreach ( $timestampKeys as $key => $infinity ) {
 				if ( isset( $item[$key] ) ) {
-					if ( $item[$key] == 'infinity' ) {
-						$result[$key] = null;
+					# Different log types use different representations of infinity.
+					if ( wfIsInfinity( $item[$key] ) ) {
+						$result[$key] = $infinity;
 					} else {
 						$result[$key] = wfTimestamp( TS_MW, $item[$key] );
 					}
