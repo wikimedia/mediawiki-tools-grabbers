@@ -13,6 +13,7 @@
 
 use MediaWiki\MediaWikiServices;
 use MediaWiki\User\UserIdentityValue;
+use MediaWiki\User\UserNameUtils;
 
 require_once __DIR__ . '/../../maintenance/Maintenance.php';
 require_once 'mediawikibot.class.php';
@@ -42,6 +43,8 @@ abstract class ExternalWikiGrabber extends Maintenance {
 	 * @var CommentStore
 	 */
 	protected $commentStore = null;
+
+	protected UserNameUtils $userNameUtils;
 
 	public function __construct() {
 		parent::__construct();
@@ -94,6 +97,7 @@ abstract class ExternalWikiGrabber extends Maintenance {
 		$services = MediaWikiServices::getInstance();
 		$this->actorStore = $services->getActorStore();
 		$this->commentStore = $services->getCommentStore();
+		$this->userNameUtils = $services->getUserNameUtils();
 	}
 
 	/**
@@ -142,6 +146,13 @@ abstract class ExternalWikiGrabber extends Maintenance {
 			return $this->actorStore->getUnknownActor();
 		}
 
+		# Old imported revisions might be assigned to anon users.
+		# We also need to prefix system users if they really have no user ID
+		# on the remote site, so we are not using ::isUsable() as ActorStore do.
+		if ( !$id && $this->userNameUtils->isValid( $name ) ) {
+			$name = 'imported>' . $name;
+		}
+
 		$userIdentity = new UserIdentityValue( $id, $name );
 		$this->actorStore->acquireActorId( $userIdentity, $this->dbw );
 
@@ -155,11 +166,7 @@ abstract class ExternalWikiGrabber extends Maintenance {
 	 * @param string $name User name or IP address
 	 */
 	function getActorFromUser( $id, $name ) {
-		if ( empty( $name ) ) {
-			$user = $this->actorStore->getUnknownActor();
-		} else {
-			$user = new UserIdentityValue( $id, $name );
-		}
+		$user = $this->getUserIdentity( $id, $name );
 
 		return $this->actorStore->acquireActorId( $user, $this->dbw );
 	}
