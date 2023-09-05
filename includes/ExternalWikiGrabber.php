@@ -12,6 +12,7 @@
  */
 
 use MediaWiki\MediaWikiServices;
+use MediaWiki\User\UserIdentity;
 use MediaWiki\User\UserIdentityValue;
 use MediaWiki\User\UserNameUtils;
 
@@ -45,6 +46,15 @@ abstract class ExternalWikiGrabber extends Maintenance {
 	protected $commentStore = null;
 
 	protected UserNameUtils $userNameUtils;
+
+	/**
+	 * Array of [ userid => newname ] pairs.
+	 *
+	 * Cache the new user name for uncompleted user rename (inconsistent database)
+	 * on old sites without the actor system, where each revision has a rev_user_text
+	 * field to be updated and the process fails.
+	 */
+	protected array $userMappings = [];
 
 	public function __construct() {
 		parent::__construct();
@@ -151,12 +161,61 @@ abstract class ExternalWikiGrabber extends Maintenance {
 		# on the remote site, so we are not using ::isUsable() as ActorStore do.
 		if ( !$id && $this->userNameUtils->isValid( $name ) ) {
 			$name = 'imported>' . $name;
+		} elseif ( $id ) {
+			$name = $this->userMappings[$id] ?? $name;
+			$userIdentity = $this->actorStore->getUserIdentityByUserId( $id );
+			if ( $userIdentity && $userIdentity->getName() !== $name ) {
+				$oldname = $userIdentity->getName();
+				# Cache the new user name for uncompleted user rename.
+				$this->userMappings[$id] = $name = $this->getAndUpdateUserName( $userIdentity );
+				$this->output( "Notice: We encountered an user rename on ID $id, $oldname => $name\n" );
+			} elseif ( $userIdentity ) {
+				return $userIdentity;
+			}
 		}
 
 		$userIdentity = new UserIdentityValue( $id, $name );
 		$this->actorStore->acquireActorId( $userIdentity, $this->dbw );
 
 		return $userIdentity;
+	}
+
+	/**
+	 * Get the current user name of the given user from the remote site,
+	 * and update our database.
+	 *
+	 * @param UserIdentity $user
+	 * @return string The new user name
+	 */
+	private function getAndUpdateUserName( UserIdentity $user ) {
+		$userid = $user->getId();
+		$params = [
+			'list' => 'users',
+			'ususerids' => $userid,
+		];
+		$result = $this->bot->query( $params );
+		if ( !isset( $result['query']['users'][0]['name'] ) ) {
+			$this->fatalError( "User ID $userid not found, is that a suppressed user now?" );
+		}
+
+		# Clear all related cache
+		MediaWikiServices::getInstance()->getUserFactory()->invalidateCache( $user );
+		$this->actorStore->deleteUserIdentityFromCache( $user );
+
+		$newname = $result['query']['users'][0]['name'];
+		# Adapt from RenameuserSQL::rename(), do we need other parts?
+		$this->dbw->newUpdateQueryBuilder()
+			->update( 'user' )
+			->set( [ 'user_name' => $newname, 'user_touched' => $this->dbw->timestamp() ] )
+			->where( [ 'user_id' => $userid ] )
+			->caller( __METHOD__ )->execute();
+		$this->dbw->newUpdateQueryBuilder()
+			->update( 'actor' )
+			->set( [ 'actor_name' => $newname ] )
+			->where( [ 'actor_user' => $userid ] )
+			->caller( __METHOD__ )->execute();
+
+		return $newname;
 	}
 
 	/**
