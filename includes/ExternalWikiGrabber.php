@@ -11,10 +11,13 @@
  * @version 1.0
  */
 
+use MediaWiki\CommentStore\CommentStore;
 use MediaWiki\MediaWikiServices;
+use MediaWiki\User\ActorStore;
 use MediaWiki\User\UserIdentity;
 use MediaWiki\User\UserIdentityValue;
 use MediaWiki\User\UserNameUtils;
+use Wikimedia\Rdbms\IDatabase;
 
 require_once __DIR__ . '/../../maintenance/Maintenance.php';
 require_once 'mediawikibot.class.php';
@@ -22,28 +25,15 @@ require_once 'mediawikibot.class.php';
 abstract class ExternalWikiGrabber extends Maintenance {
 
 	/**
-	 * Handle to the database connection
-	 *
-	 * @var DatabaseBase
+	 * Handle to the primary database connection
 	 */
-	protected $dbw;
+	protected IDatabase $dbw;
 
-	/**
-	 * MediaWikiBot instance
-	 *
-	 * @var MediaWikiBot
-	 */
-	protected $bot;
+	protected MediaWikiBot $bot;
 
-	/**
-	 * @var ActorStore
-	 */
-	private $actorStore;
+	protected ActorStore $actorStore;
 
-	/**
-	 * @var CommentStore
-	 */
-	protected $commentStore = null;
+	protected CommentStore $commentStore;
 
 	protected UserNameUtils $userNameUtils;
 
@@ -101,8 +91,8 @@ abstract class ExternalWikiGrabber extends Maintenance {
 			);
 		}
 
-		# Get a single DB_MASTER connection
-		$this->dbw = wfGetDB( DB_MASTER, [], $this->getOption( 'db', $wgDBname ) );
+		# Get a single DB_PRIMARY connection
+		$this->dbw = $this->getDB( DB_PRIMARY, [], $this->getOption( 'db', $wgDBname ) );
 
 		$services = MediaWikiServices::getInstance();
 		$this->actorStore = $services->getActorStore();
