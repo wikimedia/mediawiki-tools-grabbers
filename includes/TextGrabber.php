@@ -101,10 +101,10 @@ abstract class TextGrabber extends ExternalWikiGrabber {
 	 * @param array $revision Array retrieved from the API, containing the revision
 	 *     text, ID, timestamp, whether it was a minor edit or not and much more
 	 * @param int $page_id Page ID number of the revision we are going to insert
-	 * @param Title $title Title object of this page
+	 * @param PageIdentity $pageIdent PageIdentity object of this page
 	 * @return bool Whether revision has been inserted or not
 	 */
-	function processRevision( $revision, $page_id, $title ) {
+	function processRevision( $revision, $page_id, $pageIdent ) {
 		$revid = $revision['revid'];
 
 		# Workaround check if it's already there.
@@ -146,8 +146,8 @@ abstract class TextGrabber extends ExternalWikiGrabber {
 
 		$this->output( "Inserting revision {$revid}\n" );
 
-		$rev = new MutableRevisionRecord( $title );
-		$content = ContentHandler::makeContent( $text, $title );
+		$rev = new MutableRevisionRecord( $pageIdent );
+		$content = ContentHandler::makeContent( $text, null, $revision['contentmodel'], $revision['contentformat'] );
 		$rev->setId( $revid );
 		$rev->setContent( SlotRecord::MAIN, $content );
 		$rev->setComment( CommentStoreComment::newUnsavedComment( $comment ) );
