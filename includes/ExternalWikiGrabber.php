@@ -199,21 +199,23 @@ abstract class ExternalWikiGrabber extends Maintenance {
 		}
 
 		# Clear all related cache
-		MediaWikiServices::getInstance()->getUserFactory()->invalidateCache( $user );
+		MediaWikiServices::getInstance()->getUserFactory()->newFromUserIdentity( $user )->invalidateCache();
 		$this->actorStore->deleteUserIdentityFromCache( $user );
 
 		$newname = $result['query']['users'][0]['name'];
 		# Adapt from RenameuserSQL::rename(), do we need other parts?
-		$this->dbw->newUpdateQueryBuilder()
-			->update( 'user' )
-			->set( [ 'user_name' => $newname, 'user_touched' => $this->dbw->timestamp() ] )
-			->where( [ 'user_id' => $userid ] )
-			->caller( __METHOD__ )->execute();
-		$this->dbw->newUpdateQueryBuilder()
-			->update( 'actor' )
-			->set( [ 'actor_name' => $newname ] )
-			->where( [ 'actor_user' => $userid ] )
-			->caller( __METHOD__ )->execute();
+		$this->dbw->update(
+			'user',
+			[ 'user_name' => $newname, 'user_touched' => $this->dbw->timestamp() ],
+			[ 'user_id' => $userid ],
+			__METHOD__
+		);
+		$this->dbw->update(
+			'actor',
+			[ 'actor_name' => $newname ],
+			[ 'actor_user' => $userid ],
+			__METHOD__
+		);
 
 		return $newname;
 	}
