@@ -76,7 +76,7 @@ class GrabNewFiles extends FileGrabber {
 
 		$params = [
 			'list' => 'logevents',
-			'leprop' => 'ids|title|type|timestamp|details|comment|userid',
+			'leprop' => 'ids|title|type|timestamp|details|comment|user|userid',
 			'leend' => (string)$this->endDate,
 			'ledir' => 'newer',
 			'lestart' => (string)$this->startDate,
@@ -116,7 +116,8 @@ class GrabNewFiles extends FileGrabber {
 						} else {
 							$newTitle = $logEntry['params']['target_title'];
 						}
-						$this->processMove( $title, $newTitle, (int)$logEntry['userid'] );
+						$user = $this->getUserIdentity( (int)$logEntry['userid'], $logEntry['user'] );
+						$this->processMove( $title, $newTitle, $user );
 					}
 				}
 			}
@@ -308,10 +309,10 @@ class GrabNewFiles extends FileGrabber {
 	 *
 	 * @param $title string Old title of the file
 	 * @param $newTitle string New title of the file
-	 * @param $userId int User id which performed the move, used only when
+	 * @param $user UserIdentity user which performed the move, used only when
 	 *          the target title needs to be deleted
 	 */
-	function processMove( $title, $newTitle, $userId ) {
+	function processMove( $title, $newTitle, $user ) {
 		$this->output( "Processing move of $title to $newTitle... " );
 		# If the target page existed, it was deleted
 		# If we have the new title queued, remove it
@@ -338,10 +339,10 @@ class GrabNewFiles extends FileGrabber {
 		if ( $file->exists() ) {
 			$this->output( "$newTitle aleady exists. Deleting to make room for the move. " );
 			$reason = wfMessage( 'delete_and_move_reason', $newTitle );
-			# NOTE: File::delete takes care to do the related changes
+			# NOTE: File::deleteFile takes care to do the related changes
 			# in the database. For instance, move rows to filearchive
 			# Use the user that performed the move for the deletion
-			$status = $file->delete( $reason, false, User::newFromId( $userId ) );
+			$status = $file->deleteFile( $reason, $user );
 			if ( !$status->isOK() ) {
 				$this->fatalError( sprintf( "Failed to delete %s on move: %s",
 					$newName, implode( '. ', $status->getWikiText() ) ) );
@@ -384,7 +385,7 @@ class GrabNewFiles extends FileGrabber {
 			# Update deletion reason and user, in case we had a restore action
 			$this->pendingDeletions[$title] = [
 				'reason' => $logEntry['comment'],
-				'user' => User::newFromId( (int)$logEntry['userid'] )
+				'user' => $this->getUserIdentity( (int)$logEntry['userid'], $logEntry['user'] )
 			];
 		} elseif ( !array_key_exists( $title, $this->pendingDeletions ) ) {
 			# Check to avoid overwritting the deletion reason or user on restore,
@@ -586,7 +587,7 @@ class GrabNewFiles extends FileGrabber {
 				if ( $moveOldImage ) {
 					$this->output( "File $name does not have uploads. Deleting our file... " );
 					$file = $this->localRepo->newFile( $name );
-					$file->delete( $reason, false, $user );
+					$file->deleteFile( $reason, $user );
 					$this->output( "Done\n" );
 				} else {
 					$this->output( "File $name does not have uploads and doesn't exist in our wiki.\n" );
@@ -638,7 +639,7 @@ class GrabNewFiles extends FileGrabber {
 							# Delete it
 							$this->output( "Deleting old version with timestamp {$currentHistoryEntry['oi_timestamp']}..." );
 							$file = $this->localRepo->newFile( $name, $currentHistoryEntry['oi_timestamp'] );
-							$file->deleteOld( $file->getArchiveName(), $reason, false, $user );
+							$file->deleteOldFile( $file->getArchiveName(), $reason, $user );
 							$this->output( "Done\n" );
 							# Increase $count so we don't get stuck in an infinite loop on first oldimage version
 							$count++;
