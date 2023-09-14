@@ -88,9 +88,11 @@ class GrabProtectedTitles extends ExternalWikiGrabber {
 
 		$commentFields = $this->commentStore->insert( $this->dbw, 'pt_reason', $entry['comment'] );
 
+		$title = $this->sanitiseTitle( $entry['ns'], $entry['title'] );
+
 		$data = [
 			'pt_namespace' => $entry['ns'],
-			'pt_title' => $entry['title'],
+			'pt_title' => $title,
 			'pt_user' => $entry['userid'] ?? 0,
 			#'pt_reason' => $entry['comment'],
 			#'pt_reason_id' => 0,
@@ -99,7 +101,7 @@ class GrabProtectedTitles extends ExternalWikiGrabber {
 			'pt_create_perm' => $entry['level']
 		] + $commentFields;
 
-		$this->dbw->insert( 'protected_titles', $data, __METHOD__ );
+		$this->dbw->insert( 'protected_titles', $data, __METHOD__, [ 'IGNORE' ] );
 	}
 }
 
