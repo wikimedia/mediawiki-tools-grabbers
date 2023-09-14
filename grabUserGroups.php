@@ -57,19 +57,25 @@ class GrabUserGroups extends ExternalWikiGrabber {
 				'content-volunteer',
 				'council',
 				'fandom-editor',
+				'fandom-star',
 				'global-discussions-moderator',
 				'helper',
+				'imagereviewer',
+				'notifications-cms-user',
 				'request-to-be-forgotten-admin',
 				'reviewer',
 				'restricted-login',
 				'restricted-login-exempt',
+				'soap',
 				'staff',
 				'threadmoderator',
 				'translator',
 				'util',
 				'vanguard',
 				'voldev',
-				'vstf'
+				'vstf',
+				'wiki-representative',
+				'wiki-specialist'
 			] );
 		}
 
