@@ -64,7 +64,7 @@ class GrabNewText extends TextGrabber {
 	public function __construct() {
 		parent::__construct();
 		$this->mDescription = "Grab new changes from an external wiki and add it over an imported dump.\nFor use when the available dump is slightly out of date.";
-		$this->addOption( 'startdate', 'Start point (20121222142317, 2012-12-22T14:23:17Z, etc); note that this cannot go back further than 1-3 months on most projects', true, true );
+		$this->addOption( 'startdate', 'Start point (20121222142317, 2012-12-22T14:23:17Z, etc); note that this cannot go back further than 1-3 months on most projects. If a start date is not provided, the last revision timestamp in the database is used.', false, true );
 		$this->addOption( 'namespaces', 'A pipe-separated list of namespaces (ID) to grab changes from. Defaults to all namespaces', false, true );
 	}
 
@@ -77,7 +77,19 @@ class GrabNewText extends TextGrabber {
 				$this->fatalError( 'Invalid startdate format.' );
 			}
 		} else {
-			$this->fatalError( 'A timestamp to start from is required.' );
+			// If a start date was not provided, use the latest timestamp from the database.
+			$this->startDate = $this->dbw->selectField(
+				'revision',
+				'rev_timestamp',
+				[],
+				__METHOD__,
+				[ 'ORDER BY' => 'rev_timestamp DESC' ]
+			);
+			if ( !$this->startDate ) {
+				$this->fatalError( 'No startdate provided, and no revisions found in our DB.' );
+			}
+
+			$this->output( "Using the latest revision timestamp in our database: $this->startDate\n" );
 		}
 
 		if ( $this->hasOption( 'namespaces' ) ) {
