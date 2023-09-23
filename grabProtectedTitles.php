@@ -66,16 +66,16 @@ class GrabProtectedTitles extends ExternalWikiGrabber {
 			foreach ( $result['query']['protectedtitles'] as $logEntry ) {
 				$this->processEntry( $logEntry );
 				$i++;
+			}
 
-				if ( isset( $result['query-continue'] ) && isset( $result['query-continue']['protectedtitles'] ) ) {
-					$params = array_merge( $params, $result['query-continue']['protectedtitles'] );
-					$this->output( "{$i} entries processed.\n" );
-				} elseif ( isset( $result['continue'] ) ) {
-					$params = array_merge( $params, $result['continue'] );
-					$this->output( "{$i} entries processed.\n" );
-				} else {
-					$more = false;
-				}
+			if ( isset( $result['query-continue'] ) && isset( $result['query-continue']['protectedtitles'] ) ) {
+				$params = array_merge( $params, $result['query-continue']['protectedtitles'] );
+				$this->output( "{$i} entries processed.\n" );
+			} elseif ( isset( $result['continue'] ) ) {
+				$params = array_merge( $params, $result['continue'] );
+				$this->output( "{$i} entries processed.\n" );
+			} else {
+				$more = false;
 			}
 
 		} while ( $more );

@@ -118,22 +118,20 @@ class GrabLogs extends ExternalWikiGrabber {
 				}
 				$currentIDs[] = $logEntry['logid'];
 
-				if ( isset( $result['query-continue'] ) && isset( $result['query-continue']['logevents'] ) ) {
-					$params = array_merge( $params, $result['query-continue']['logevents'] );
-				} elseif ( isset( $result['continue'] ) ) {
-					$params = array_merge( $params, $result['continue'] );
-				} else {
-					$more = false;
-				}
-
 				$i++;
 				if ( $i % 500 == 0 ) {
 					$this->output( "{$i} logs fetched...\n" );
 				}
 			}
-
 			$processedInPrevBatch = $currentIDs;
 
+			if ( isset( $result['query-continue'] ) && isset( $result['query-continue']['logevents'] ) ) {
+				$params = array_merge( $params, $result['query-continue']['logevents'] );
+			} elseif ( isset( $result['continue'] ) ) {
+				$params = array_merge( $params, $result['continue'] );
+			} else {
+				$more = false;
+			}
 		} while ( $more );
 
 		$this->output( "Done. {$i} logs fetched.\n" );

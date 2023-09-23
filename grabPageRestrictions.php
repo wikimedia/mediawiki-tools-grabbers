@@ -95,16 +95,16 @@ class GrabPageRestrictions extends ExternalWikiGrabber {
 			foreach ( $result['query']['pages'] as $page ) {
 				$this->processPage( $page );
 				$this->pageCount++;
+			}
 
-				if ( isset( $result['query-continue']['pages'] ) ) {
-					$params = array_merge( $params, $result['query-continue']['pages'] );
-					$this->output( "$this->pageCount entries processed.\n" );
-				} elseif ( isset( $result['continue'] ) ) {
-					$params = array_merge( $params, $result['continue'] );
-					$this->output( "$this->pageCount entries processed.\n" );
-				} else {
-					$more = false;
-				}
+			if ( isset( $result['query-continue']['pages'] ) ) {
+				$params = array_merge( $params, $result['query-continue']['pages'] );
+				$this->output( "$this->pageCount entries processed.\n" );
+			} elseif ( isset( $result['continue'] ) ) {
+				$params = array_merge( $params, $result['continue'] );
+				$this->output( "$this->pageCount entries processed.\n" );
+			} else {
+				$more = false;
 			}
 
 		} while ( $more );
