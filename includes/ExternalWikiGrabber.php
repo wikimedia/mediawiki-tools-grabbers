@@ -7,11 +7,10 @@
  * @author Jack Phoenix <jack@shoutwiki.com>
  * @author Calimonious the Estrange
  * @author Jesús Martínez <martineznovo@gmail.com>
- * @date 5 August 2019
- * @version 1.0
+ * @date 5 November 2023
+ * @version 1.1
  */
 
-use MediaWiki\CommentStore\CommentStore;
 use MediaWiki\MediaWikiServices;
 use MediaWiki\User\ActorStore;
 use MediaWiki\User\UserIdentity;
