@@ -9,7 +9,7 @@
  * @author Jack Phoenix <jack@shoutwiki.com>
  * @author Jesús Martínez <martineznovo@gmail.com>
  * @version 1.0
- * @date 11 April 2021
+ * @date 6 December 2023
  */
 
 require_once 'includes/FileGrabber.php';
@@ -42,7 +42,7 @@ class GrabImages extends FileGrabber {
 			'generator' => 'allimages',
 			'gailimit' => 'max',
 			'prop' => 'imageinfo',
-			'iiprop' => 'url|sha1',
+			'iiprop' => 'url|sha1|mime',
 			'iilimit' => '1'
 		];
 
@@ -106,7 +106,15 @@ class GrabImages extends FileGrabber {
 			$sha1 = Wikimedia\base_convert( $fileVersion['sha1'], 16, 36, 31 );
 			$path = "$folder/$name";
 
-			$status = $this->downloadFile( $url, $path, $sha1 );
+			if ( file_exists( $path ) ) {
+				$storedSha1 = Wikimedia\base_convert( sha1_file( $path ), 16, 36, 31 );
+				if ( $storedSha1 == $sha1 ) {
+					$this->output( "File {$name} already exists. SKIPPED\n" );
+					return $count;
+				}
+			}
+
+			$status = $this->downloadFile( $url, $path, $name, $sha1 );
 
 			if ( $status->isOK() ) {
 				$count++;
