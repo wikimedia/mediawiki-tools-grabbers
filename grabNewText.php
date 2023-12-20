@@ -143,6 +143,7 @@ class GrabNewText extends TextGrabber {
 			$result = $this->bot->query( $params );
 			if ( empty( $result['query']['recentchanges'] ) ) {
 				$this->output( 'No changes found...' );
+				break;
 			}
 			foreach ( $result['query']['recentchanges'] as $entry ) {
 				# new pages, new uploads, edited pages
