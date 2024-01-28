@@ -7,7 +7,7 @@
  * @author Jack Phoenix <jack@shoutwiki.com>
  * @author Calimonious the Estrange
  * @author Jesús Martínez <martineznovo@gmail.com>
- * @date 5 November 2023
+ * @date 21 January 2024
  * @version 1.1
  */
 
@@ -145,11 +145,21 @@ abstract class ExternalWikiGrabber extends Maintenance {
 			return $this->actorStore->getUnknownActor();
 		}
 
-		# Old imported revisions might be assigned to anon users.
-		# We also need to prefix system users if they really have no user ID
-		# on the remote site, so we are not using ::isUsable() as ActorStore do.
-		if ( !$id && $this->userNameUtils->isValid( $name ) ) {
-			$name = 'imported>' . $name;
+		if ( !$id and !$this->userNameUtils->isIP( $name ) and !ExternalUserNames::isExternal( $name ) ) {
+			# Everything that's not an IP or external, must be converted to external
+			# Old imported revisions might be assigned to anon users.
+			# We also need to prefix system users if they really have no user ID
+			$name = "imported>$name";
+		} elseif ( $id and !$this->userNameUtils->isValid( $name ) ) {
+			# T353766: There's an edge case of apparently valid but not canonicalized usernames.
+			# For example, usernames which start with lowercase characters.
+			# Those users cause problems when this script detects a user name change,
+			# because ActorStore does a normalization when inserting, but the external wiki
+			# may have old users that don't follow current canonicalization rules.
+			# Users with non-canonicalized names will be reported as invalid, and despite having
+			# user id on the external wiki, they'll be inserted as imported to avoid further errors
+			$name = "imported>$name";
+			$id = 0;
 		} elseif ( $id ) {
 			$name = $this->userMappings[$id] ?? $name;
 			$userIdentity = $this->actorStore->getUserIdentityByUserId( $id );
@@ -157,7 +167,7 @@ abstract class ExternalWikiGrabber extends Maintenance {
 				$oldname = $userIdentity->getName();
 				# Cache the new user name for uncompleted user rename.
 				$this->userMappings[$id] = $name = $this->getAndUpdateUserName( $userIdentity );
-				$this->output( "Notice: We encountered an user rename on ID $id, $oldname => $name\n" );
+				$this->output( "Notice: We encountered a user rename on ID $id, $oldname => $name\n" );
 			} elseif ( $userIdentity ) {
 				return $userIdentity;
 			}
