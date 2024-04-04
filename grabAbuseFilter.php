@@ -32,7 +32,7 @@ class GrabAbuseFilter extends ExternalWikiGrabber {
 
 	public function __construct() {
 		parent::__construct();
-		$this->mDescription = 'Grabs logs from a pre-existing wiki into a new wiki.';
+		$this->addDescription( 'Grabs logs from a pre-existing wiki into a new wiki.' );
 	}
 
 	public function execute() {

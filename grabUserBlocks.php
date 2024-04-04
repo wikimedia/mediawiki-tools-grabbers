@@ -21,7 +21,7 @@ class GrabUserBlocks extends ExternalWikiGrabber {
 
 	public function __construct() {
 		parent::__construct();
-		$this->mDescription = 'Grabs user block data from a pre-existing wiki into a new wiki.';
+		$this->addDescription( 'Grabs user block data from a pre-existing wiki into a new wiki.' );
 		$this->addOption( 'startdate', 'Start point (20121222142317, 2012-12-22T14:23:17Z, etc).', false, true );
 		$this->addOption( 'enddate', 'End point (20121222142317, 2012-12-22T14:23:17Z, etc); defaults to current timestamp.', false, true );
 	}

@@ -18,8 +18,10 @@ class GrabImages extends FileGrabber {
 
 	public function __construct() {
 		parent::__construct();
-		$this->mDescription = 'Get images from an external wiki and save them to our disk. ' .
-			'This script does not import them to the wiki. If you want files to be imported, use grabFiles instead.';
+		$this->addDescription(
+			'Get images from an external wiki and save them to our disk. ' .
+			'This script does not import them to the wiki. If you want files to be imported, use grabFiles instead.'
+		);
 		$this->addOption( 'folder', 'Folder to save images to', true /* required? */, true /* withArg */ );
 		$this->addOption( 'from', 'Name of file to start from', false /* required? */, true /* withArg */ );
 	}

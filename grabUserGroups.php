@@ -30,7 +30,7 @@ class GrabUserGroups extends ExternalWikiGrabber {
 
 	public function __construct() {
 		parent::__construct();
-		$this->mDescription = 'Grabs user group assignments from a pre-existing wiki into a new wiki.';
+		$this->addDescription( 'Grabs user group assignments from a pre-existing wiki into a new wiki.' );
 		$this->addOption( 'groups', 'Get only a specific list of groups (pipe separated list of group names, by default everything except *, user and autoconfirmed)', false, true );
 		$this->addOption( 'wikia', 'Set this param if the target wiki is on Wikia/Fandom, to automatically skip most of the global user groups that are irrelevant outside there', false, false );
 	}

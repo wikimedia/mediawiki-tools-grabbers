@@ -25,7 +25,7 @@ class GrabDeletedFiles extends FileGrabber {
 
 	public function __construct() {
 		parent::__construct();
-		$this->mDescription = 'Grabs deleted files from a pre-existing wiki into a new wiki.';
+		$this->addDescription( 'Grabs deleted files from a pre-existing wiki into a new wiki.' );
 		$this->addOption( 'imagesurl', 'URL to the target wiki\'s images directory', false, true, 'i' );
 		$this->addOption( 'scrape', 'Use screenscraping instead of the API?'
 			. ' (note: you don\'t want to do this unless you really have to.)', false, false, 's' );

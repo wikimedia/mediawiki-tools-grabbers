@@ -25,7 +25,9 @@ class GrabFiles extends FileGrabber {
 
 	public function __construct() {
 		parent::__construct();
-		$this->mDescription = 'Grabs files from a pre-existing wiki into a new wiki, using file upload configuration of the local wiki.';
+		$this->addDescription(
+			'Grabs files from a pre-existing wiki into a new wiki, using file upload configuration of the local wiki.'
+		);
 		$this->addOption( 'from', 'Name of file to start from', false, true );
 		$this->addOption( 'enddate', 'Date after which to ignore new files (20121222142317, 2012-12-22T14:23:17Z, etc)', false, true );
 	}

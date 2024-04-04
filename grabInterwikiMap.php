@@ -27,7 +27,7 @@ require_once 'includes/ExternalWikiGrabber.php';
 class GrabInterwikiMap extends ExternalWikiGrabber {
 	public function __construct() {
 		parent::__construct();
-		$this->mDescription = 'Grab the interwiki map from an external wiki and import it into one of ours.';
+		$this->addDescription( 'Grab the interwiki map from an external wiki and import it into one of ours.' );
 		$this->addOption( 'interlang', 'Grab and insert only interlanguage links and nothing else', false, false );
 	}
 

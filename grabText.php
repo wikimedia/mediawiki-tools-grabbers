@@ -20,7 +20,9 @@ class GrabText extends TextGrabber {
 
 	public function __construct() {
 		parent::__construct();
-		$this->mDescription = "Grab text from an external wiki and import it into one of ours.\nDon't use this on a large wiki unless you absolutely must; it will be incredibly slow.";
+		$this->addDescription(
+			"Grab text from an external wiki and import it into one of ours.\nDon't use this on a large wiki unless you absolutely must; it will be incredibly slow."
+		);
 		$this->addOption( 'start', 'Page at which to start, useful if the script stopped at this point', false, true );
 		$this->addOption( 'namespaces', 'Pipe-separated namespaces (ID) to grab. Defaults to all namespaces', false, true );
 	}

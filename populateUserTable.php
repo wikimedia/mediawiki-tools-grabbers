@@ -24,7 +24,7 @@ class PopulateUserTable extends Maintenance {
 
 	public function __construct() {
 		parent::__construct();
-		$this->mDescription = 'Populates the user table creating stub users (user ID and name) from other tables.';
+		$this->addDescription( 'Populates the user table creating stub users (user ID and name) from other tables.' );
 		$this->addOption( 'db', 'Database name, if we don\'t want to write to $wgDBname', false /* required? */, true /* withArg */ );
 	}
 

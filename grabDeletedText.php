@@ -51,7 +51,7 @@ class GrabDeletedText extends TextGrabber {
 
 	public function __construct() {
 		parent::__construct();
-		$this->mDescription = "Grab deleted text from an external wiki and import it into one of ours.";
+		$this->addDescription( 'Grab deleted text from an external wiki and import it into one of ours.' );
 		# $this->addOption( 'start', 'Revision at which to start', false, true );
 		#$this->addOption( 'startdate', 'Not yet implemented.', false, true );
 		$this->addOption( 'drcontinue', 'API continue to restart deleted revision process', false, true );

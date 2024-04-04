@@ -16,7 +16,7 @@ require_once 'includes/ExternalWikiGrabber.php';
 class GrabNamespaceInfo extends ExternalWikiGrabber {
 	public function __construct() {
 		parent::__construct();
-		$this->mDescription = "Get namespace info from a source wiki to add to your LocalSettings.php";
+		$this->addDescription( 'Get namespace info from a source wiki to add to your LocalSettings.php' );
 	}
 
 	public function execute() {

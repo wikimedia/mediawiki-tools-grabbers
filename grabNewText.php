@@ -63,7 +63,9 @@ class GrabNewText extends TextGrabber {
 
 	public function __construct() {
 		parent::__construct();
-		$this->mDescription = "Grab new changes from an external wiki and add it over an imported dump.\nFor use when the available dump is slightly out of date.";
+		$this->addDescription(
+			"Grab new changes from an external wiki and add it over an imported dump.\nFor use when the available dump is slightly out of date."
+		);
 		$this->addOption( 'startdate', 'Start point (20121222142317, 2012-12-22T14:23:17Z, etc); note that this cannot go back further than 1-3 months on most projects. If a start date is not provided, the last revision timestamp in the database is used.', false, true );
 		$this->addOption( 'namespaces', 'A pipe-separated list of namespaces (ID) to grab changes from. Defaults to all namespaces', false, true );
 	}
