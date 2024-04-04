@@ -16,12 +16,7 @@ require_once 'includes/FileGrabber.php';
 
 class GrabFiles extends FileGrabber {
 
-	/**
-	 * End date
-	 *
-	 * @var MWTimestamp
-	 */
-	protected $endDate;
+	protected string $endDate;
 
 	public function __construct() {
 		parent::__construct();

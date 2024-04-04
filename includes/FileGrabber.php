@@ -17,13 +17,6 @@ require_once 'ExternalWikiGrabber.php';
 abstract class FileGrabber extends ExternalWikiGrabber {
 
 	/**
-	 * End date
-	 *
-	 * @var string
-	 */
-	protected $endDate;
-
-	/**
 	 * Local file repository
 	 *
 	 * @var LocalRepo

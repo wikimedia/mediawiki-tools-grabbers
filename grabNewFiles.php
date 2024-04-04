@@ -15,19 +15,9 @@ require_once 'includes/FileGrabber.php';
 
 class GrabNewFiles extends FileGrabber {
 
-	/**
-	 * Start date
-	 *
-	 * @var MWTimestamp
-	 */
-	protected $startDate;
+	protected string $startDate;
 
-	/**
-	 * End date
-	 *
-	 * @var MWTimestamp
-	 */
-	protected $endDate;
+	protected string $endDate;
 
 	/**
 	 * A list of page titles of images that have uploads pending
