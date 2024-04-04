@@ -129,7 +129,7 @@ abstract class FileGrabber extends ExternalWikiGrabber {
 			'img_minor_mime' => $file_e['minor_mime']
 		] + $commentFields;
 		$this->dbw->insert( 'image', $e, __METHOD__ );
-		$status = $this->storeFileFromURL( $name, $fileurl, false );
+		$status = $this->storeFileFromURL( $name, $fileurl, false, $fileVersion['sha1'] );
 		$this->output( "Done\n" );
 		return $status;
 	}
@@ -227,7 +227,7 @@ abstract class FileGrabber extends ExternalWikiGrabber {
 			'oi_minor_mime' => $file_e['minor_mime']
 		] + $commentFields;
 		$this->dbw->insert( 'oldimage', $e, __METHOD__ );
-		$status = $this->storeFileFromURL( $name, $fileurl, $file_e['timestamp'] );
+		$status = $this->storeFileFromURL( $name, $fileurl, $file_e['timestamp'], $fileVersion['sha1'] );
 		$this->output( "Done\n" );
 		return $status;
 	}
@@ -301,8 +301,7 @@ abstract class FileGrabber extends ExternalWikiGrabber {
 			if ( is_null( $sha1 ) ) {
 				return $status;
 			}
-			# Check sha1
-			$storedSha1 = Wikimedia\base_convert( sha1_file( $targetTempFile ), 16, 36, 31 );
+			$storedSha1 = sha1_file( $targetTempFile );
 			if ( $storedSha1 == $sha1 ) {
 				return $status;
 			}

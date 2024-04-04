@@ -105,15 +105,11 @@ class GrabImages extends FileGrabber {
 			}
 
 			$url = $this->sanitiseUrl( $fileVersion['url'] );
-			$sha1 = Wikimedia\base_convert( $fileVersion['sha1'], 16, 36, 31 );
 			$path = "$folder/$name";
 
-			if ( file_exists( $path ) ) {
-				$storedSha1 = Wikimedia\base_convert( sha1_file( $path ), 16, 36, 31 );
-				if ( $storedSha1 == $sha1 ) {
-					$this->output( "File {$name} already exists. SKIPPED\n" );
-					return $count;
-				}
+			if ( file_exists( $path ) && sha1_file( $path ) == $fileVersion['sha1'] ) {
+				$this->output( "File {$name} already exists. SKIPPED\n" );
+				return $count;
 			}
 
 			$status = $this->downloadFile( $url, $path, $name, $sha1 );
