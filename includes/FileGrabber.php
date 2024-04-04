@@ -24,13 +24,6 @@ abstract class FileGrabber extends ExternalWikiGrabber {
 	protected $localRepo;
 
 	/**
-	 * Temporal file handle
-	 *
-	 * @var FileHandle
-	 */
-	protected $mTmpHandle;
-
-	/**
 	 * Mime type analyzer
 	 *
 	 * @var MimeAnalyzer
@@ -286,17 +279,14 @@ abstract class FileGrabber extends ExternalWikiGrabber {
 	 * @return Status status of the operation
 	 */
 	function downloadFile( $fileurl, $targetTempFile, $relatedFileName, $sha1 = null ) {
-		$this->mTmpHandle = fopen( $targetTempFile, 'wb' );
-		if (!$this->mTmpHandle) {
-			$status = Status::newFatal( 'CANTCREATEFILE' ); # Not an existing message but whatever
-			return $status;
-		}
+		// The request class since 1.33 based on Guzzle supports the sink option.
 		$req = MediaWikiServices::getInstance()->getHttpRequestFactory()
-			->create( $fileurl, [ 'timeout' => 90 ], __METHOD__ );
-		$req->setCallback( [ $this, 'saveTempFileChunk' ] );
+			->create( $fileurl, [
+				'timeout' => 90,
+				'sink' => $targetTempFile,
+			], __METHOD__ );
 		$this->setRelevantAcceptHeader( $req, $relatedFileName );
 		$status = $req->execute();
-		fclose( $this->mTmpHandle );
 		if ( $status->isOK() ) {
 			if ( is_null( $sha1 ) ) {
 				return $status;
@@ -313,28 +303,6 @@ abstract class FileGrabber extends ExternalWikiGrabber {
 				$fileurl, $status->getWikiText() ) );
 		}
 		return $status;
-	}
-
-	/**
-	 * Callback: save a chunk of the result of a HTTP request to the temporary file
-	 * Copied from UploadFromUrl
-	 *
-	 * @param mixed $req
-	 * @param string $buffer
-	 * @return int Number of bytes handled
-	 */
-	function saveTempFileChunk( $req, $buffer ) {
-		$nbytes = fwrite( $this->mTmpHandle, $buffer );
-
-		if ( $nbytes != strlen( $buffer ) ) {
-			// Well... that's not good!
-			$this->output( sprintf( " Short write %s/%s bytes, aborting.\n",
-				$nbytes, strlen( $buffer ) ), 1 );
-			fclose( $this->mTmpHandle );
-			$this->mTmpHandle = false;
-		}
-
-		return $nbytes;
 	}
 
 	/**
