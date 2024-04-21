@@ -112,7 +112,7 @@ class GrabImages extends FileGrabber {
 				return $count;
 			}
 
-			$status = $this->downloadFile( $url, $path, $name, $sha1 );
+			$status = $this->downloadFile( $url, $path, $name, $fileVersion['sha1'] );
 
 			if ( $status->isOK() ) {
 				$count++;

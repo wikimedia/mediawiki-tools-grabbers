@@ -344,6 +344,7 @@ abstract class FileGrabber extends ExternalWikiGrabber {
 		# with regex right now. --ashley, 17 April 2016
 		if ( $this->isWikia &&
 			$fileVersion['mime'] == 'video/youtube' &&
+			isset( $fileVersion['mediatype'] ) &&
 			strtoupper( $fileVersion['mediatype'] ) == 'VIDEO'
 		) {
 			return true;
