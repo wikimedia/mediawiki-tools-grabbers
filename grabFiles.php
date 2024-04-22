@@ -16,7 +16,7 @@ require_once 'includes/FileGrabber.php';
 
 class GrabFiles extends FileGrabber {
 
-	protected string $endDate;
+	protected ?string $endDate;
 
 	public function __construct() {
 		parent::__construct();
